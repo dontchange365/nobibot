@@ -3,319 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram-Like Chat App (Server-Side)</title>
-    
+    <title>Simple Chatbot</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #fafafa;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            color: #262626;
-        }
-
-        .chat-container {
-            width: 100%;
-            max-width: 450px;
-            height: 100vh;
-            background-color: #fff;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
-        }
-
-        .chat-header {
-            background-color: #fff;
-            border-bottom: 1px solid #efefef;
-            padding: 10px 15px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-
-        .chat-header .profile-info {
-            display: flex;
-            align-items: center;
-        }
-
-        .chat-header .back-arrow {
-            font-size: 1.5em;
-            margin-right: 15px;
-            color: #262626;
-            cursor: pointer;
-        }
-
-        .chat-header .profile-pic {
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
-            padding: 2px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-right: 10px;
-            overflow: hidden;
-        }
-        .chat-header .profile-pic img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 50%;
-            border: 2px solid #fff;
-        }
-
-        .chat-header .profile-name {
-            font-weight: 600;
-            font-size: 1.05em;
-            color: #262626;
-        }
-        .chat-header .profile-status {
-            font-size: 0.8em;
-            color: #8e8e8e;
-        }
-
-        .chat-header .icons {
-            display: flex;
-            gap: 25px;
-            font-size: 1.4em;
-            color: #262626;
-        }
-
-        .chat-messages {
-            flex-grow: 1;
-            padding: 15px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            -webkit-overflow-scrolling: touch;
-            background-color: #f0f2f5;
-        }
-
-        .message-bubble {
-            padding: 10px 15px;
-            border-radius: 20px;
-            margin-bottom: 8px;
-            max-width: 78%;
-            word-wrap: break-word;
-            font-size: 0.9em;
-            line-height: 1.4;
-            box-shadow: 0 1px 0.5px rgba(0,0,0,0.05);
-        }
-
-        .message-bubble.sent {
-            background: linear-gradient(to right, #833ab4, #fd1d1d, #fcb045);
-            color: white;
-            align-self: flex-end;
-        }
-
-        .message-bubble.received {
-            background-color: #efefef;
-            color: #262626;
-            align-self: flex-start;
-        }
-
-        .message-bubble.voice-message {
-            background-color: #efefef;
-            color: #262626;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 15px;
-            border-radius: 20px;
-        }
-        .message-bubble.voice-message .play-icon {
-            font-size: 1.2em;
-            color: #262626;
-        }
-        .message-bubble.voice-message .waveform {
-            flex-grow: 1;
-            height: 20px;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20"><rect width="2" height="10" x="0" y="5" fill="%238e8e8e"/><rect width="2" height="15" x="4" y="2.5" fill="%238e8e8e"/><rect width="2" height="8" x="8" y="6" fill="%238e8e8e"/><rect width="2" height="12" x="12" y="4" fill="%238e8e8e"/><rect width="2" height="18" x="16" y="1" fill="%238e8e8e"/><rect width="2" height="10" x="20" y="5" fill="%238e8e8e"/><rect width="2" height="14" x="24" y="3" fill="%238e8e8e"/><rect width="2" height="7" x="28" y="6.5" fill="%238e8e8e"/><rect width="2" height="11" x="32" y="4.5" fill="%238e8e8e"/><rect width="2" height="16" x="36" y="2" fill="%238e8e8e"/><rect width="2" height="9" x="40" y="5.5" fill="%238e8e8e"/><rect width="2" height="13" x="44" y="3.5" fill="%238e8e8e"/><rect width="2" height="6" x="48" y="7" fill="%238e8e8e"/><rect width="2" height="10" x="52" y="5" fill="%238e8e8e"/><rect width="2" height="15" x="56" y="2.5" fill="%238e8e8e"/><rect width="2" height="8" x="60" y="6" fill="%238e8e8e"/><rect width="2" height="12" x="64" y="4" fill="%238e8e8e"/><rect width="2" height="18" x="68" y="1" fill="%238e8e8e"/><rect width="2" height="10" x="72" y="5" fill="%238e8e8e"/><rect width="2" height="14" x="76" y="3" fill="%238e8e8e"/><rect width="2" height="7" x="80" y="6.5" fill="%238e8e8e"/><rect width="2" height="11" x="84" y="4.5" fill="%238e8e8e"/><rect width="2" height="16" x="88" y="2" fill="%238e8e8e"/><rect width="2" height="9" x="92" y="5.5" fill="%238e8e8e"/><rect width="2" height="13" x="96" y="3.5" fill="%238e8e8e"/></svg>');
-            background-repeat: no-repeat;
-            background-size: contain;
-            background-position: center;
-        }
-
-        .chat-input-area {
-            background-color: #fff;
-            padding: 8px 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border-top: 1px solid #efefef;
-        }
-
-        .chat-input-area .icon {
-            color: #8e8e8e;
-            font-size: 1.5em;
-            cursor: pointer;
-        }
-
-        #message-input {
-            flex-grow: 1;
-            background-color: #efefef;
-            color: #262626;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 20px;
-            font-size: 0.95em;
-            outline: none;
-        }
-
-        #message-input::placeholder {
-            color: #8e8e8e;
-        }
-
-        #send-button {
-            background: transparent;
-            color: #0095f6;
-            border: none;
-            padding: 5px;
-            cursor: pointer;
-            font-size: 1.5em;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: opacity 0.2s ease-in-out;
-            margin-left: 5px;
-        }
-
-        #send-button:hover {
-            opacity: 0.7;
-        }
-
-        .icon {
-            font-family: 'Arial', sans-serif;
-        }
-
-        #send-button.hidden {
-            display: none;
-        }
-        .chat-input-area .initial-icons {
-            display: flex;
-            gap: 10px;
-        }
-        .chat-input-area .initial-icons.hidden {
-            display: none;
-        }
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f4f4f4; }
+        .chat-container { background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 400px; display: flex; flex-direction: column; height: 500px; overflow: hidden; }
+        .chat-messages { flex-grow: 1; padding: 20px; overflow-y: auto; border-bottom: 1px solid #eee; }
+        .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 5px; max-width: 80%; }
+        .message.user { background-color: #007bff; color: white; align-self: flex-end; margin-left: auto; }
+        .message.bot { background-color: #e2e6ea; color: #333; align-self: flex-start; margin-right: auto; }
+        .chat-input { display: flex; padding: 15px; border-top: 1px solid #eee; }
+        .chat-input input { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-right: 10px; }
+        .chat-input button { padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .chat-input button:hover { background-color: #218838; }
     </style>
 </head>
 <body>
     <div class="chat-container">
-        <div class="chat-header">
-            <div class="profile-info">
-                <span class="back-arrow">&#x2190;</span>
-                <div class="profile-pic">
-                    <img src="https://via.placeholder.com/38" alt="Profile Pic">
-                </div>
-                <div>
-                    <div class="profile-name">utkarshgottmilfs</div>
-                    <div class="profile-status">Active now</div>
-                </div>
-            </div>
-            <div class="icons">
-                <span class="icon">&#x1F4F9;</span>
-                <span class="icon">&#x260E;</span>
-            </div>
-        </div>
         <div class="chat-messages" id="chat-messages">
             </div>
-        <div class="chat-input-area">
-            <span class="icon">&#x1F60A;</span>
-            <input type="text" id="message-input" placeholder="Message...">
-            <div class="initial-icons">
-                <span class="icon">&#x1F4F7;</span>
-                <span class="icon">&#x1F3A4;</span>
-            </div>
-            <button id="send-button" class="hidden">&#x27A4;</button>
+        <div class="chat-input">
+            <input type="text" id="message-input" placeholder="Type your message...">
+            <button id="send-button">Send</button>
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const messageInput = document.getElementById('message-input');
-            const sendButton = document.getElementById('send-button');
-            const chatMessages = document.getElementById('chat-messages');
-            const initialIcons = document.querySelector('.initial-icons');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const chatMessages = document.getElementById('chat-messages');
 
-            // --- Socket.IO Client Connection ---
-            const socket = io(); // Connects to the server running on the same host/port
+        // Function to display a message in the chat
+        function displayMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender);
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+        }
 
-            // Function to toggle send button visibility
-            function toggleSendButton() {
-                if (messageInput.value.trim() !== '') {
-                    sendButton.classList.remove('hidden');
-                    initialIcons.classList.add('hidden');
+        // Function to send a message to the server
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (text === '') return;
+
+            displayMessage(text, 'user'); // Display user's message immediately
+            messageInput.value = ''; // Clear input
+
+            try {
+                const response = await fetch('/api/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    displayMessage(data.botMessage.text, 'bot'); // Display bot's reply
                 } else {
-                    sendButton.classList.add('hidden');
-                    initialIcons.classList.remove('hidden');
+                    console.error('Error from server:', data.error);
+                    displayMessage('Error: Could not get a reply from the bot.', 'bot');
                 }
+            } catch (error) {
+                console.error('Network error:', error);
+                displayMessage('Error: Could not connect to the server.', 'bot');
             }
+        }
 
-            // Function to display a message in the chat UI
-            function displayMessage(msg) {
-                const messageBubble = document.createElement('div');
-                messageBubble.classList.add('message-bubble');
-
-                // Determine if it's a sent or received message
-                // For simplicity, we'll assume messages originating from this client are 'sent'
-                // In a multi-user app, you'd check msg.username against the current user's username
-                if (msg.username === 'You') { // Assuming 'You' is the current user for demo
-                    messageBubble.classList.add('sent');
-                } else {
-                    messageBubble.classList.add('received');
-                }
-                
-                messageBubble.textContent = msg.text;
-                chatMessages.appendChild(messageBubble);
-                chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
             }
-
-            // Handle sending messages
-            function sendMessage() {
-                const messageText = messageInput.value.trim();
-
-                if (messageText !== '') {
-                    // Emit the message to the server
-                    socket.emit('chat_message', { username: 'You', text: messageText }); // Send with a 'You' username for now
-
-                    messageInput.value = ''; // Clear input
-                    toggleSendButton(); // Update button visibility
-                }
-            }
-
-            // --- Socket.IO Event Listeners ---
-
-            // Listen for 'load_messages' event (when user connects)
-            socket.on('load_messages', (messages) => {
-                chatMessages.innerHTML = ''; // Clear existing messages
-                messages.forEach(msg => displayMessage(msg));
-            });
-
-            // Listen for 'chat_message' event (new message from server)
-            socket.on('chat_message', (msg) => {
-                displayMessage(msg);
-            });
-
-            // Event listeners for UI interactions
-            sendButton.addEventListener('click', sendMessage);
-
-            messageInput.addEventListener('keypress', (event) => {
-                if (event.key === 'Enter') {
-                    sendMessage();
-                }
-            });
-
-            messageInput.addEventListener('input', toggleSendButton);
         });
+
+        // Optional: Load chat history when the page loads
+        async function loadChatHistory() {
+            try {
+                const response = await fetch('/api/messages');
+                const messages = await response.json();
+                if (response.ok) {
+                    messages.forEach(msg => displayMessage(msg.text, msg.sender));
+                } else {
+                    console.error('Error loading history:', messages.error);
+                }
+            } catch (error) {
+                console.error('Network error loading history:', error);
+            }
+        }
+
+        loadChatHistory(); // Call this on page load
     </script>
 </body>
 </html>
