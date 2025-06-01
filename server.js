@@ -41,7 +41,7 @@ const ChatReplySchema = new mongoose.Schema({
     replies: [String],
     priority: { type: Number, default: 0 },
     isDefault: { type: Boolean, default: false },
-    sendMethod: { type: String, enum: ['random', 'all', 'once'], default: 'random' } // ✅ new field
+    sendMethod: { type: String, enum: ['random', 'all', 'once'], default: 'random' }
 });
 const ChatReply = mongoose.model('ChatReply', ChatReplySchema);
 
@@ -54,7 +54,7 @@ app.use(session({
     store: MongoStore.create({ mongoUrl: MONGO_URI }),
     cookie: { maxAge: 24 * 60 * 60 * 1000 }
 }));
-app.use(express.static(path.join(__dirname, 'public'))); // This line serves static files from the 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Middleware
 function isAuthenticated(req, res, next) {
@@ -71,7 +71,8 @@ function getHtmlTemplate(title, bodyContent) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${title}</title>
-        <link rel="stylesheet" href="/style.css"> </head>
+        <link rel="stylesheet" href="/style.css">
+    </head>
     <body>
         ${bodyContent}
     </body>
@@ -80,7 +81,7 @@ function getHtmlTemplate(title, bodyContent) {
 }
 
 // --- Custom Replacements Logic ---
-function handleReplySend(replyObj, userMessage) { // userMessage as an argument
+function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSession = {}) {
     if (!replyObj || !replyObj.replies || replyObj.replies.length === 0) return "No reply found";
 
     let replyText;
@@ -99,20 +100,122 @@ function handleReplySend(replyObj, userMessage) { // userMessage as an argument
     }
 
     const now = new Date();
-    // Using 'en-IN' locale for date and time formatting relevant to India (Patna, Bihar)
+    // Using 'en-IN' locale for date and time formatting relevant to India
     const optionsDate = { year: 'numeric', month: 'long', day: 'numeric' };
-    const optionsTime = { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true };
+    const optionsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }; // 2-digit for consistent hh:mm:ss
+    const optionsHourShort = { hour: 'numeric', hour12: true };
+    const optionsHour24 = { hour: '2-digit', hourCycle: 'h23' };
+    const optionsHour24Short = { hour: 'numeric', hourCycle: 'h23' };
+    const optionsMonthName = { month: 'long' };
+    const optionsMonthNameShort = { month: 'short' };
+    const optionsDayOfWeek = { weekday: 'long' };
+    const optionsDayOfWeekShort = { weekday: 'short' };
 
-    // Replace %date%
+
+    // 1. Message variables
+    replyText = replyText.replace(/%message%/g, userMessage || '');
+    replyText = replyText.replace(/%message_(\d+)%/g, (match, len) => (userMessage || '').substring(0, parseInt(len)));
+
+    // Capturing groups (only applicable if used with Expert Pattern Matching and regex matched)
+    if (matchedRegexGroups) {
+        replyText = replyText.replace(/%capturing_group_(\d+)%/g, (match, groupId) => {
+            return matchedRegexGroups[parseInt(groupId)] || '';
+        });
+    }
+
+    // 2. Name variables
+    // For now, assuming a default 'User' or a session username for demonstration
+    // In a real app, you'd get this from authenticated user data or a chat platform API
+    const userName = reqSession.username || 'User'; // If admin is logged in, use admin username
+    replyText = replyText.replace(/%name%/g, userName);
+    replyText = replyText.replace(/%first_name%/g, userName.split(' ')[0] || '');
+    replyText = replyText.replace(/%last_name%/g, userName.split(' ').slice(1).join(' ') || ''); // Gets everything after the first word
+    replyText = replyText.replace(/%chat_name%/g, userName); // Assuming chat name is same as user name for 1-1 chats
+
+    // 3. Date & Time variables
     replyText = replyText.replace(/%date%/g, now.toLocaleDateString('en-IN', optionsDate));
-    // Replace %time%
     replyText = replyText.replace(/%time%/g, now.toLocaleTimeString('en-IN', optionsTime));
-    // Replace %rule_name%
-    replyText = replyText.replace(/%rule_name%/g, replyObj.ruleName || 'Unnamed Rule');
-    // Replace %username%
-    // This requires storing user data, for now using a placeholder 'User'.
-    // If you have user accounts, you could retrieve req.session.username here.
-    replyText = replyText.replace(/%username%/g, 'User');
+
+    replyText = replyText.replace(/%hour%/g, now.toLocaleTimeString('en-IN', optionsHourShort).split(' ')[0]);
+    replyText = replyText.replace(/%hour_short%/g, now.toLocaleTimeString('en-IN', { hour: 'numeric', hour12: true }).split(' ')[0]);
+    replyText = replyText.replace(/%hour_of_day%/g, now.toLocaleTimeString('en-IN', optionsHour24).split(' ')[0]);
+    replyText = replyText.replace(/%hour_of_day_short%/g, now.toLocaleTimeString('en-IN', optionsHour24Short).split(' ')[0]);
+    replyText = replyText.replace(/%minute%/g, String(now.getMinutes()).padStart(2, '0'));
+    replyText = replyText.replace(/%second%/g, String(now.getSeconds()).padStart(2, '0'));
+    replyText = replyText.replace(/%millisecond%/g, String(now.getMilliseconds()).padStart(3, '0'));
+    replyText = replyText.replace(/%am\/pm%/g, now.getHours() >= 12 ? 'pm' : 'am');
+
+    replyText = replyText.replace(/%day_of_month%/g, String(now.getDate()).padStart(2, '0'));
+    replyText = replyText.replace(/%day_of_month_short%/g, String(now.getDate()));
+    replyText = replyText.replace(/%month%/g, String(now.getMonth() + 1).padStart(2, '0'));
+    replyText = replyText.replace(/%month_short%/g, String(now.getMonth() + 1));
+    replyText = replyText.replace(/%month_name%/g, now.toLocaleDateString('en-IN', optionsMonthName));
+    replyText = replyText.replace(/%month_name_short%/g, now.toLocaleDateString('en-IN', optionsMonthNameShort));
+    replyText = replyText.replace(/%year%/g, String(now.getFullYear()));
+    replyText = replyText.replace(/%year_short%/g, String(now.getFullYear()).slice(-2));
+    replyText = replyText.replace(/%day_of_week%/g, now.toLocaleDateString('en-IN', optionsDayOfWeek));
+    replyText = replyText.replace(/%day_of_week_short%/g, now.toLocaleDateString('en-IN', optionsDayOfWeekShort));
+
+    // Day of year and Week of year (more complex, require external lib or careful calculation)
+    // For simplicity, I'll add placeholders or basic implementation.
+    // If you need exact Day of Year and Week of Year, consider a library like 'date-fns'.
+    // Placeholder for now:
+    replyText = replyText.replace(/%day_of_year%/g, 'N/A_DayOfYear');
+    replyText = replyText.replace(/%week_of_year%/g, 'N/A_WeekOfYear');
+
+    // Countdown variables are complex due to Unix timestamp conversion and live updating.
+    // Skipping for now as they typically need frontend JS or more backend state management.
+
+    // 4. AutoResponder variables
+    replyText = replyText.replace(/%rule_id%/g, replyObj._id ? replyObj._id.toString() : 'N/A');
+
+    // Skipping app_name, app_version, app_url as they are mobile app specific.
+    // Skipping received_count, reply_count etc. as they require chat-specific state tracking for each user,
+    // which is more complex than simple session-based tracking.
+
+    // 5. Random variables
+    replyText = replyText.replace(/%rndm_num_(\d+)_(\d+)%/g, (match, min, max) => {
+        return String(Math.floor(Math.random() * (parseInt(max) - parseInt(min) + 1)) + parseInt(min));
+    });
+
+    replyText = replyText.replace(/%rndm_custom_(\d+)_(.*?)%/g, (match, len, charSet) => {
+        len = parseInt(len);
+        const chars = charSet.split(/,(?![^[]*\])/).map(s => s.trim()); // Splits by comma, but not inside [] (if any)
+        let result = '';
+        for (let i = 0; i < len; i++) {
+            result += chars[Math.floor(Math.random() * chars.length)];
+        }
+        return result;
+    });
+
+    // Helper to generate random string from a character set
+    const generateRandomString = (length, charSet) => {
+        let result = '';
+        for (let i = 0; i < length; i++) {
+            result += charSet.charAt(Math.floor(Math.random() * charSet.length));
+        }
+        return result;
+    };
+
+    replyText = replyText.replace(/%rndm_abc_lower_(\d+)%/g, (match, len) => generateRandomString(parseInt(len), 'abcdefghijklmnopqrstuvwxyz'));
+    replyText = replyText.replace(/%rndm_abc_upper_(\d+)%/g, (match, len) => generateRandomString(parseInt(len), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'));
+    replyText = replyText.replace(/%rndm_abc_(\d+)%/g, (match, len) => generateRandomString(parseInt(len), 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'));
+    replyText = replyText.replace(/%rndm_abcnum_lower_(\d+)%/g, (match, len) => generateRandomString(parseInt(len), 'abcdefghijklmnopqrstuvwxyz0123456789'));
+    replyText = replyText.replace(/%rndm_abcnum_upper_(\d+)%/g, (match, len) => generateRandomString(parseInt(len), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'));
+    replyText = replyText.replace(/%rndm_abcnum_(\d+)%/g, (match, len) => generateRandomString(parseInt(len), 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'));
+    replyText = replyText.replace(/%rndm_ascii_(\d+)%/g, (match, len) => {
+        let result = '';
+        for (let i = 0; i < parseInt(len); i++) {
+            result += String.fromCharCode(Math.floor(Math.random() * 95) + 32); // Printable ASCII (32-126)
+        }
+        return result;
+    });
+    replyText = replyText.replace(/%rndm_symbol_(\d+)%/g, (match, len) => generateRandomString(parseInt(len), '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'));
+    replyText = replyText.replace(/%rndm_grawlix_(\d+)%/g, (match, len) => generateRandomString(parseInt(len), '#$%&@*!'));
+
+
+    // Skipping URL encoded and previous message/reply variables for now due to complexity in current setup.
+    // Skipping message processing time as it requires measuring execution time.
 
     return replyText;
 }
@@ -123,10 +226,11 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-// CHATBOT API (no change needed here as it's an API endpoint)
+// CHATBOT API
 app.post('/api/chatbot/message', async (req, res) => {
     const userMessage = req.body.message;
     let botReply = "Sorry, I didn't understand that.";
+    let matchedRegexGroups = null; // To store capturing groups if regex matches
 
     // 🆕 First-time welcome
     if (!req.session.seenWelcome) {
@@ -134,7 +238,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         try {
             const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
             if (welcomeReply) {
-                return res.json({ reply: handleReplySend(welcomeReply, userMessage) });
+                return res.json({ reply: handleReplySend(welcomeReply, userMessage, null, req.session) });
             }
         } catch (e) {
             console.error("Welcome message error:", e);
@@ -145,31 +249,36 @@ app.post('/api/chatbot/message', async (req, res) => {
         // 1. Exact Match
         const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
         if (exact) {
-        return res.json({ reply: handleReplySend(exact, userMessage) });
-    }
+            return res.json({ reply: handleReplySend(exact, userMessage, null, req.session) });
+        }
 
         // 2. Pattern Matching
         const patterns = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 });
         for (const reply of patterns) {
             const keywords = reply.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
             if (keywords.some(k => userMessage.toLowerCase().includes(k))) {
-                return res.json({ reply: handleReplySend(reply, userMessage) });
+                return res.json({ reply: handleReplySend(reply, userMessage, null, req.session) });
             }
         }
 
-        // 3. Regex Matching
+        // 3. Regex Matching (Expert Pattern Matching)
         const regexMatches = await ChatReply.find({ type: 'expert_pattern_matching', pattern: { $ne: null } }).sort({ priority: -1 });
         for (const reply of regexMatches) {
             try {
-                if (new RegExp(reply.pattern, 'i').test(userMessage)) {
-                    return res.json({ reply: handleReplySend(reply, userMessage) });
+                const regex = new RegExp(reply.pattern, 'i');
+                const match = regex.exec(userMessage);
+                if (match) {
+                    matchedRegexGroups = match; // Store groups for replacement
+                    return res.json({ reply: handleReplySend(reply, userMessage, matchedRegexGroups, req.session) });
                 }
-            } catch (e) { }
+            } catch (e) {
+                console.error("Regex pattern error:", e);
+            }
         }
 
         // 4. Default Fallback
         const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
-        if (fallback) return res.json({ reply: handleReplySend(fallback, userMessage) });
+        if (fallback) return res.json({ reply: handleReplySend(fallback, userMessage, null, req.session) });
 
     } catch (e) {
         console.error(e);
@@ -203,7 +312,7 @@ app.post('/admin/login', async (req, res) => {
         `));
     }
     req.session.loggedIn = true;
-    req.session.username = username;
+    req.session.username = username; // Store username in session
     res.redirect('/admin/dashboard');
 });
 
@@ -254,13 +363,19 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
 
         <div id="patternField" style="display:none;">
             <label for="pattern">Regex Pattern:</label>
-            <input name="pattern" id="pattern" placeholder="Only for Expert Regex" />
+            <input name="pattern" id="pattern" placeholder="Only for Expert Regex. Use () for capturing groups." />
         </div>
 
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <textarea name="replies" id="replies" required></textarea>
-        <small>Available replacements: **%date%**, **%time%**, **%rule_name%**, **%username%**</small>
-
+        <small>
+            **Available replacements:**<br>
+            **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
+            **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
+            **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
+            **AutoResponder:** %rule_id%<br>
+            **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
+        </small>
 
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="0" />
@@ -512,7 +627,14 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
 
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>
-        <small>Available replacements: **%date%**, **%time%**, **%rule_name%**, **%username%**</small>
+        <small>
+            **Available replacements:**<br>
+            **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
+            **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
+            **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
+            **AutoResponder:** %rule_id%<br>
+            **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
+        </small>
 
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="${r.priority}" />
@@ -587,7 +709,7 @@ app.post('/api/update-priorities', async (req, res) => {
         }
         res.json({ message: 'Priorities updated' });
     } catch (err) {
-                console.error('Error updating priorities:', err); // Better error logging
+        console.error('Error updating priorities:', err);
         res.status(500).json({ message: 'Server error: Could not update priorities.' });
     }
 });
