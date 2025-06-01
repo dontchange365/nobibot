@@ -1,14 +1,19 @@
 {
   "name": "your-project-name",
   "version": "1.0.0",
-  "description": "Your project description",
+  "description": "A Node.js project with an admin panel.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "node",
+    "express",
+    "mongodb",
+    "admin-panel"
+  ],
+  "author": "Nobita",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -16,6 +21,5 @@
     "express": "^4.19.2",
     "express-session": "^1.18.0",
     "mongoose": "^8.4.1"
-    
   }
 }
