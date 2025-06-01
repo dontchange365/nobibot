@@ -3,8 +3,8 @@ const bodyParser = require('body-parser');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const path = require('path');
-const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,10 +12,10 @@ const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://dontchange365:DtUiOMFzQVM0tG9l@nobifeedback.9ntuipc.mongodb.net/?retryWrites=true&w=majority&appName=nobifeedback';
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ MongoDB Connected'))
-    .catch(err => console.error('❌ MongoDB Error:', err));
+    .then(() => console.log('MongoDB Connected!'))
+    .catch(err => console.error('MongoDB connection error:', err));
 
-// Schemas
+// Admin Schema
 const AdminSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true }
@@ -32,250 +32,224 @@ AdminSchema.methods.comparePassword = function(candidatePassword) {
 };
 const Admin = mongoose.model('Admin', AdminSchema);
 
+// Chat Reply Schema
 const ChatReplySchema = new mongoose.Schema({
-    type: {
-        type: String,
-        enum: ['welcome_message', 'exact_match', 'pattern_matching', 'expert_pattern_matching', 'default_message'],
-        required: true
-    },
-    keyword: { type: String, trim: true, sparse: true },
-    replies: { type: [String], required: true },
-    pattern: { type: String, trim: true },
+    type: { type: String, required: true },
+    keyword: String,
+    pattern: String,
+    replies: [String],
     priority: { type: Number, default: 0 },
     isDefault: { type: Boolean, default: false }
-}, { timestamps: true });
-ChatReplySchema.index({ type: 1, keyword: 1 });
+});
 const ChatReply = mongoose.model('ChatReply', ChatReplySchema);
 
-// Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(session({
-    secret: 'SuperSecureSecret123',
+    secret: 'MySuperStrongSecretKey!',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-        mongoUrl: MONGO_URI,
-        ttl: 1000 * 60 * 60 * 24,
-        autoRemove: 'interval',
-        autoRemoveInterval: 60
-    }),
-    cookie: {
-        maxAge: 1000 * 60 * 60 * 24,
-        secure: false,
-        httpOnly: true,
-        sameSite: 'lax'
-    }
+    store: MongoStore.create({ mongoUrl: MONGO_URI }),
+    cookie: { maxAge: 24 * 60 * 60 * 1000 }
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Middleware
 function isAuthenticated(req, res, next) {
-    if (req.session.loggedIn) next();
-    else res.redirect('/admin/login');
+    if (req.session.loggedIn) return next();
+    return res.redirect('/admin/login');
 }
 
 // Routes
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-// Chatbot API
+// CHATBOT API
 app.post('/api/chatbot/message', async (req, res) => {
     const userMessage = req.body.message;
-    let botReply = "Nobi Bot: I didn't understand that.";
+    let botReply = "Sorry, I didn't understand that.";
 
     try {
-        const exactMatch = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
-        if (exactMatch) {
-            const reply = exactMatch.replies[Math.floor(Math.random() * exactMatch.replies.length)];
-            return res.json({ reply });
-        }
+        // 1. Exact Match
+        const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
+        if (exact) return res.json({ reply: randomReply(exact.replies) });
 
-        const patternMatches = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 });
-        for (const entry of patternMatches) {
-            const keywords = entry.keyword.toLowerCase().split(' ');
-            const words = userMessage.toLowerCase().split(' ');
-            if (keywords.some(k => words.includes(k))) {
-                const reply = entry.replies[Math.floor(Math.random() * entry.replies.length)];
-                return res.json({ reply });
+        // 2. Pattern Matching (comma keywords)
+        const patterns = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 });
+        for (const reply of patterns) {
+            const keywords = reply.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
+            if (keywords.some(k => userMessage.toLowerCase().includes(k))) {
+                return res.json({ reply: randomReply(reply.replies) });
             }
         }
 
-        const expertPatterns = await ChatReply.find({ type: 'expert_pattern_matching' }).sort({ priority: -1 });
-        for (const entry of expertPatterns) {
+        // 3. Expert Regex
+        const regexMatches = await ChatReply.find({ type: 'expert_pattern_matching', pattern: { $ne: null } }).sort({ priority: -1 });
+        for (const reply of regexMatches) {
             try {
-                const regex = new RegExp(entry.pattern, 'i');
-                if (regex.test(userMessage)) {
-                    const reply = entry.replies[Math.floor(Math.random() * entry.replies.length)];
-                    return res.json({ reply });
+                if (new RegExp(reply.pattern, 'i').test(userMessage)) {
+                    return res.json({ reply: randomReply(reply.replies) });
                 }
-            } catch (e) {
-                console.error('Regex Error:', e);
-            }
+            } catch (e) { }
         }
 
+        // 4. Default
         const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
-        if (fallback) {
-            const reply = fallback.replies[Math.floor(Math.random() * fallback.replies.length)];
-            return res.json({ reply });
-        }
+        if (fallback) return res.json({ reply: randomReply(fallback.replies) });
 
-    } catch (err) {
-        console.error('Chat Error:', err);
+    } catch (e) {
+        console.error(e);
+        botReply = "Nobi Bot error: try again later.";
     }
 
     res.json({ reply: botReply });
 });
+const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-// Admin Login Page
+// ADMIN LOGIN
 app.get('/admin/login', (req, res) => {
-    if (req.session.loggedIn) return res.redirect('/admin/dashboard');
     res.send(`
-    <html><head><title>Login</title>
-    <style>
-    body { margin:0; font-family:sans-serif; background:#eef; display:flex; align-items:center; justify-content:center; height:100vh; }
-    .box { background:#fff; padding:30px; box-shadow:0 0 20px rgba(0,0,0,0.1); border-radius:8px; width:300px; }
-    input { width:100%; margin:10px 0; padding:10px; border-radius:4px; border:1px solid #ccc; }
-    button { width:100%; padding:10px; background:#007bff; color:#fff; border:none; border-radius:4px; cursor:pointer; }
-    button:hover { background:#0056b3; }
-    </style>
-    </head>
-    <body>
-    <div class="box">
-        <h2 style="text-align:center">Admin Login</h2>
-        ${req.query.error ? `<p style="color:red;text-align:center">Invalid credentials</p>` : ''}
-        <form method="POST">
-            <input name="username" placeholder="Username" required />
-            <input name="password" type="password" placeholder="Password" required />
-            <button type="submit">Login</button>
-        </form>
-    </div></body></html>
-    `);
+    <form method="POST" action="/admin/login">
+    <h2>Login</h2>
+    <input name="username" placeholder="Username" required />
+    <input type="password" name="password" placeholder="Password" required />
+    <button>Login</button>
+    </form>`);
 });
 
 app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
-    try {
-        const admin = await Admin.findOne({ username });
-        if (!admin || !(await admin.comparePassword(password))) {
-            return res.redirect('/admin/login?error=true');
-        }
-        req.session.loggedIn = true;
-        req.session.username = admin.username;
-        req.session.save(() => res.redirect('/admin/dashboard'));
-    } catch (e) {
-        console.error('Login error:', e);
-        res.redirect('/admin/login?error=true');
+    const admin = await Admin.findOne({ username });
+    if (!admin || !(await admin.comparePassword(password))) {
+        return res.send('Login failed. <a href="/admin/login">Try again</a>');
     }
+    req.session.loggedIn = true;
+    req.session.username = username;
+    res.redirect('/admin/dashboard');
 });
 
-// Dashboard
+// ADMIN DASHBOARD
 app.get('/admin/dashboard', isAuthenticated, (req, res) => {
-    res.send(`
-    <html><head><title>Dashboard</title>
-    <style>
-    body { font-family: sans-serif; background:#f8f9fa; margin:0; padding:0; display:flex; justify-content:center; align-items:center; height:100vh; }
-    .card { background:white; padding:40px; border-radius:10px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:400px; text-align:center; }
-    a { display:block; margin:10px 0; padding:10px; background:#007bff; color:white; text-decoration:none; border-radius:5px; }
-    a:hover { background:#0056b3; }
-    </style>
-    </head><body>
-    <div class="card">
-        <h2>Welcome, ${req.session.username}</h2>
-        <a href="/admin/add-chat-replies">➕ Add Chat Replies</a>
-        <a href="/admin/logout" style="background:#dc3545;">🚪 Logout</a>
-    </div>
-    </body></html>
-    `);
+    res.send(`<h1>Welcome Admin: ${req.session.username}</h1>
+    <a href="/admin/add-chat-replies">Add Chat Reply</a> |
+    <a href="/admin/reply-list">View Replies</a> |
+    <a href="/admin/logout">Logout</a>`);
 });
 
-// Logout
+// LOGOUT
 app.get('/admin/logout', (req, res) => {
     req.session.destroy(() => res.redirect('/admin/login'));
 });
 
-// Add Chat Replies Form (GET)
+// ADD REPLY FORM
 app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
     res.send(`
-    <html><head><title>Add Chat Replies</title>
-    <style>
-    body { background:#f2f2f2; font-family:sans-serif; margin:0; padding:40px; }
-    .form-container { max-width:600px; background:#fff; margin:auto; padding:30px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.1); }
-    input, select, textarea, button { width:100%; margin-bottom:15px; padding:10px; border:1px solid #ccc; border-radius:4px; font-size:16px; }
-    button { background:#28a745; color:#fff; border:none; cursor:pointer; }
-    button:hover { background:#218838; }
-    .back { background:#007bff; text-align:center; display:inline-block; padding:10px 20px; border-radius:5px; color:#fff; text-decoration:none; }
-    </style>
-    </head><body>
-    <div class="form-container">
-        <h2>Add New Chat Reply</h2>
-        ${req.query.success ? '<p style="color:green">✅ Reply Added Successfully!</p>' : ''}
-        ${req.query.error ? `<p style="color:red">❌ ${req.query.error_msg || 'Something went wrong.'}</p>` : ''}
-        <form method="POST">
-            <select name="type" required>
-                <option value="">Select Type</option>
-                <option>welcome_message</option>
-                <option>exact_match</option>
-                <option>pattern_matching</option>
-                <option>expert_pattern_matching</option>
-                <option>default_message</option>
-            </select>
-            <input name="keyword" placeholder="Keyword (optional)" />
-            <input name="pattern" placeholder="Pattern (Regex) (optional)" />
-            <textarea name="replies" placeholder="Reply lines (use <#> to separate)" required></textarea>
-            <input type="number" name="priority" placeholder="Priority" value="0" />
-            <button type="submit">Save Reply</button>
-        </form>
-        <a href="/admin/dashboard" class="back">← Back to Dashboard</a>
-    </div></body></html>
-    `);
+    <form method="POST" action="/admin/add-chat-replies">
+    <h2>Add Chat Reply</h2>
+    <label>Type</label>
+    <select name="type" required>
+        <option>exact_match</option>
+        <option>pattern_matching</option>
+        <option>expert_pattern_matching</option>
+        <option>welcome_message</option>
+        <option>default_message</option>
+    </select>
+    <label>Keyword(s) (comma separated)</label>
+    <input name="keyword" placeholder="e.g. hi, hello" />
+    <label>Regex Pattern</label>
+    <input name="pattern" placeholder="Only for expert_pattern_matching" />
+    <label>Replies (use <#> between lines)</label>
+    <textarea name="replies"></textarea>
+    <label>Priority</label>
+    <input type="number" name="priority" value="0" />
+    <label>Is Default?</label>
+    <select name="isDefault"><option value="false">No</option><option value="true">Yes</option></select>
+    <button>Add</button></form>`);
 });
 
-// Add Chat Replies Form (POST)
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
-    const { type, keyword, replies, pattern, priority } = req.body;
+    const { type, keyword, pattern, replies, priority, isDefault } = req.body;
+    if (!replies) return res.send('Replies required');
 
-    try {
-        const replyLines = replies.split('<#>').map(line => line.trim()).filter(Boolean);
-        if (!type || replyLines.length === 0) {
-            return res.redirect('/admin/add-chat-replies?error=true&error_msg=Missing required fields.');
-        }
-
-        if ((type === 'exact_match' || type === 'pattern_matching') && !keyword) {
-            return res.redirect('/admin/add-chat-replies?error=true&error_msg=Keyword is required.');
-        }
-
-        if (type === 'expert_pattern_matching' && !pattern) {
-            return res.redirect('/admin/add-chat-replies?error=true&error_msg=Pattern is required.');
-        }
-
-        if (type === 'default_message') {
-            await ChatReply.updateMany({ isDefault: true, type: 'default_message' }, { $set: { isDefault: false } });
-        }
-
-        if (type === 'welcome_message') {
-            await ChatReply.updateMany({ type: 'welcome_message' }, { $set: { type: 'exact_match', keyword: 'welcome_msg_fallback', priority: -1 } });
-        }
-
-        const newReply = new ChatReply({
-            type,
-            keyword: ['exact_match', 'pattern_matching'].includes(type) ? keyword.toLowerCase() : null,
-            pattern: type === 'expert_pattern_matching' ? pattern : null,
-            replies: replyLines,
-            priority: parseInt(priority) || 0,
-            isDefault: type === 'default_message'
-        });
-
-        await newReply.save();
-        res.redirect('/admin/add-chat-replies?success=true');
-
-    } catch (err) {
-        console.error('🔥 Chat Reply Save Error:', err);
-        res.redirect(`/admin/add-chat-replies?error=true&error_msg=${encodeURIComponent(err.message)}`);
+    if (type === 'default_message' && isDefault === 'true') {
+        await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
     }
+
+    const newReply = new ChatReply({
+        type,
+        keyword: keyword || '',
+        pattern: pattern || '',
+        replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
+        priority: parseInt(priority),
+        isDefault: isDefault === 'true'
+    });
+
+    await newReply.save();
+    res.redirect('/admin/reply-list');
 });
 
-// Start Server
+// REPLY LIST
+app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
+    const replies = await ChatReply.find().sort({ priority: -1 });
+    const list = replies.map(r => `
+    <tr>
+    <td>${r.type}</td>
+    <td>${r.keyword}</td>
+    <td>${r.priority}</td>
+    <td>${r.replies.slice(0, 2).join(' | ')}${r.replies.length > 2 ? '...' : ''}</td>
+    <td>${r.isDefault ? '✅' : ''}</td>
+    <td>
+        <a href="/admin/edit-reply/${r._id}">✏️</a>
+        <a href="/admin/delete-reply/${r._id}" onclick="return confirm('Delete?')">🗑️</a>
+    </td></tr>`).join('');
+    res.send(`<table border="1"><tr>
+    <th>Type</th><th>Keywords</th><th>Priority</th><th>Replies</th><th>Default</th><th>Actions</th>
+    </tr>${list}</table><br><a href="/admin/dashboard">← Back</a>`);
+});
+
+// EDIT REPLY
+app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
+    const r = await ChatReply.findById(req.params.id);
+    res.send(`
+    <form method="POST" action="/admin/edit-reply/${r._id}">
+    <h2>Edit Reply</h2>
+    <input name="type" value="${r.type}" readonly />
+    <input name="keyword" value="${r.keyword || ''}" />
+    <input name="pattern" value="${r.pattern || ''}" />
+    <textarea name="replies">${r.replies.join(' <#> ')}</textarea>
+    <input type="number" name="priority" value="${r.priority}" />
+    <select name="isDefault">
+        <option value="false" ${!r.isDefault && 'selected'}>No</option>
+        <option value="true" ${r.isDefault && 'selected'}>Yes</option>
+    </select>
+    <button>Update</button>
+    </form>`);
+});
+
+app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
+    const { keyword, pattern, replies, priority, isDefault } = req.body;
+    const update = {
+        keyword: keyword || '',
+        pattern: pattern || '',
+        replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
+        priority: parseInt(priority),
+        isDefault: isDefault === 'true'
+    };
+    if (update.isDefault) {
+        await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
+    }
+    await ChatReply.findByIdAndUpdate(req.params.id, update);
+    res.redirect('/admin/reply-list');
+});
+
+// DELETE
+app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
+    await ChatReply.findByIdAndDelete(req.params.id);
+    res.redirect('/admin/reply-list');
+});
+
+// START
 app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
+    console.log(`NOBITA Bot Server Running @ http://localhost:${PORT}`);
 });
