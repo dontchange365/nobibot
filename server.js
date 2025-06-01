@@ -79,6 +79,45 @@ function getHtmlTemplate(title, bodyContent) {
     `;
 }
 
+// --- Custom Replacements Logic ---
+function handleReplySend(replyObj, userMessage) { // userMessage as an argument
+    if (!replyObj || !replyObj.replies || replyObj.replies.length === 0) return "No reply found";
+
+    let replyText;
+
+    switch (replyObj.sendMethod) {
+        case 'once':
+            replyText = replyObj.replies[0];
+            break;
+        case 'all':
+            replyText = replyObj.replies.join('\n');
+            break;
+        case 'random':
+        default:
+            replyText = randomReply(replyObj.replies);
+            break;
+    }
+
+    const now = new Date();
+    // Using 'en-IN' locale for date and time formatting relevant to India (Patna, Bihar)
+    const optionsDate = { year: 'numeric', month: 'long', day: 'numeric' };
+    const optionsTime = { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true };
+
+    // Replace %date%
+    replyText = replyText.replace(/%date%/g, now.toLocaleDateString('en-IN', optionsDate));
+    // Replace %time%
+    replyText = replyText.replace(/%time%/g, now.toLocaleTimeString('en-IN', optionsTime));
+    // Replace %rule_name%
+    replyText = replyText.replace(/%rule_name%/g, replyObj.ruleName || 'Unnamed Rule');
+    // Replace %username%
+    // This requires storing user data, for now using a placeholder 'User'.
+    // If you have user accounts, you could retrieve req.session.username here.
+    replyText = replyText.replace(/%username%/g, 'User');
+
+    return replyText;
+}
+
+
 // Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));
@@ -95,7 +134,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         try {
             const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
             if (welcomeReply) {
-                return res.json({ reply: randomReply(welcomeReply.replies) });
+                return res.json({ reply: handleReplySend(welcomeReply, userMessage) });
             }
         } catch (e) {
             console.error("Welcome message error:", e);
@@ -106,7 +145,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         // 1. Exact Match
         const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
         if (exact) {
-        return res.json({ reply: handleReplySend(exact) });
+        return res.json({ reply: handleReplySend(exact, userMessage) });
     }
 
         // 2. Pattern Matching
@@ -114,7 +153,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         for (const reply of patterns) {
             const keywords = reply.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
             if (keywords.some(k => userMessage.toLowerCase().includes(k))) {
-                return res.json({ reply: randomReply(reply.replies) });
+                return res.json({ reply: handleReplySend(reply, userMessage) });
             }
         }
 
@@ -123,14 +162,14 @@ app.post('/api/chatbot/message', async (req, res) => {
         for (const reply of regexMatches) {
             try {
                 if (new RegExp(reply.pattern, 'i').test(userMessage)) {
-                    return res.json({ reply: randomReply(reply.replies) });
+                    return res.json({ reply: handleReplySend(reply, userMessage) });
                 }
             } catch (e) { }
         }
 
         // 4. Default Fallback
         const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
-        if (fallback) return res.json({ reply: randomReply(fallback.replies) });
+        if (fallback) return res.json({ reply: handleReplySend(fallback, userMessage) });
 
     } catch (e) {
         console.error(e);
@@ -220,6 +259,8 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
 
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <textarea name="replies" id="replies" required></textarea>
+        <small>Available replacements: **%date%**, **%time%**, **%rule_name%**, **%username%**</small>
+
 
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="0" />
@@ -471,6 +512,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
 
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>
+        <small>Available replacements: **%date%**, **%time%**, **%rule_name%**, **%username%**</small>
 
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="${r.priority}" />
@@ -529,20 +571,6 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     res.redirect('/admin/reply-list');
 });
 
-function handleReplySend(replyObj) {
-    if (!replyObj || !replyObj.replies || replyObj.replies.length === 0) return "No reply found";
-
-    switch (replyObj.sendMethod) {
-        case 'once':
-            return replyObj.replies[0]; // First one always
-        case 'all':
-            return replyObj.replies.join('\n'); // All line by line
-        case 'random':
-        default:
-            return randomReply(replyObj.replies); // Random default
-    }
-}
-
 // DELETE
 app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
     await ChatReply.findByIdAndDelete(req.params.id);
@@ -559,8 +587,8 @@ app.post('/api/update-priorities', async (req, res) => {
         }
         res.json({ message: 'Priorities updated' });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error' });
+                console.error('Error updating priorities:', err); // Better error logging
+        res.status(500).json({ message: 'Server error: Could not update priorities.' });
     }
 });
 
