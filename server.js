@@ -133,19 +133,83 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
                 .admin-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; width: 400px; }
                 h1 { color: #28a745; margin-bottom: 20px; }
                 p { color: #6c757d; font-size: 1.1em; margin-bottom: 25px; }
-                a { display: inline-block; margin-top: 20px; padding: 10px 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px; font-size: 1em; }
-                a:hover { background-color: #c82333; }
+                .nav-links a { display: inline-block; margin: 0 10px; padding: 10px 15px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; }
+                .nav-links a:hover { background-color: #0056b3; }
+                .logout-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px; }
+                .logout-link:hover { background-color: #c82333; }
             </style>
         </head>
         <body>
             <div class="admin-container">
                 <h1>Welcome to the Admin Panel, ${req.session.username}!</h1>
-                <p>This is a protected area. You can manage your content here.</p>
-                <a href="/admin/logout">Logout</a>
+                <p>Here you can manage your website's content and users.</p>
+                <div class="nav-links">
+                    <a href="/admin/list-admins">Manage Admins</a>
+                    </div>
+                <a href="/admin/logout" class="logout-link">Logout</a>
             </div>
         </body>
         </html>
     `);
+});
+
+// NEW FEATURE: List all Admin Users
+app.get('/admin/list-admins', isAuthenticated, async (req, res) => {
+    try {
+        const admins = await Admin.find({}, 'username'); // Fetch only username, not password
+        let adminListHtml = `
+            <h2>Registered Admin Users</h2>
+            <table style="width:100%; border-collapse: collapse; margin-top: 20px;">
+                <tr style="background-color: #f2f2f2;">
+                    <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Username</th>
+                    <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Actions</th>
+                </tr>
+        `;
+
+        if (admins.length === 0) {
+            adminListHtml += `<tr><td colspan="2" style="padding: 8px; border: 1px solid #ddd; text-align: center;">No admin users found.</td></tr>`;
+        } else {
+            admins.forEach(admin => {
+                adminListHtml += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${admin.username}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">
+                            <a href="/admin/edit-admin/${admin._id}" style="color: blue; text-decoration: none; margin-right: 10px;">Edit</a>
+                            <a href="/admin/delete-admin/${admin._id}" style="color: red; text-decoration: none;">Delete</a>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        adminListHtml += `</table><p><a href="/admin/dashboard" style="display: block; margin-top: 20px; text-align: center; text-decoration: none; color: #007bff;">Back to Dashboard</a></p>`;
+
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Admin List</title>
+                <style>
+                    body { font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; background-color: #e9ecef; margin: 0; }
+                    .container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; width: 600px; max-width: 90%; }
+                    h2 { color: #333; margin-bottom: 20px; }
+                    table th, table td { text-align: left; padding: 8px; border: 1px solid #ddd; }
+                    table th { background-color: #f2f2f2; }
+                    a { text-decoration: none; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    ${adminListHtml}
+                </div>
+            </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('Error fetching admins:', error);
+        res.status(500).send('Error loading admin list.');
+    }
 });
 
 app.get('/admin/logout', (req, res) => {
