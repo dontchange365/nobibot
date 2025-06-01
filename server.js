@@ -290,57 +290,67 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const replies = await ChatReply.find().sort({ priority: -1 });
 
-    const list = replies.map(r => {
-        const keywordDisplay = r.keyword ? r.keyword.slice(0, 40) + (r.keyword.length > 40 ? "..." : "") : '';
-        return `
-        <div class="reply-card">
-            <h3>${r.ruleName}</h3>
-            <p><strong>Type:</strong> ${r.type}</p>
-            ${keywordDisplay ? `<p><strong>Keywords:</strong> ${keywordDisplay}</p>` : ''}
-            <div class="actions">
-                <a href="/admin/edit-reply/${r._id}" class="edit-btn">✏️ Edit</a>
-                <a href="/admin/delete-reply/${r._id}" class="delete-btn" onclick="return confirm('Are you sure you want to delete this reply?')">🗑️ Delete</a>
+    const listItems = replies.map((r, index) => `
+        <li class="reply-item" data-id="${r._id}" draggable="true">
+            <div class="title">
+                <strong>${r.ruleName}</strong>
+                <span class="type">(${r.type})</span>
             </div>
-        </div>
-        `;
-    }).join('');
+            ${r.keyword ? `<div class="keywords">${r.keyword.slice(0, 60)}${r.keyword.length > 60 ? '...' : ''}</div>` : ''}
+            <div class="actions">
+                <a href="/admin/edit-reply/${r._id}" class="edit-btn">✏️</a>
+                <a href="/admin/delete-reply/${r._id}" class="delete-btn" onclick="return confirm('Delete this rule?')">🗑️</a>
+            </div>
+        </li>
+    `).join('');
 
-    const html = `
-    <h2>All Chatbot Rules</h2>
-    <div class="reply-list">
-        ${list}
-    </div>
-    <br>
+    const content = `
+    <h2>🧠 Chat Rules (Drag to Reorder, Tap to Set Priority)</h2>
+    <ul id="replyList" class="reply-list">${listItems}</ul>
     <a href="/admin/dashboard">← Back to Dashboard</a>
 
     <style>
         .reply-list {
+            list-style: none;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 0;
+            margin: 20px 0;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 10px;
         }
-        .reply-card {
+        .reply-item {
             background: #fff;
-            padding: 20px;
-            border-radius: 10px;
+            padding: 15px;
+            border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            cursor: grab;
+            transition: transform 0.2s;
         }
-        .reply-card h3 {
+        .reply-item:active {
+            transform: scale(1.02);
+        }
+        .title {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .type {
+            font-size: 12px;
+            color: #555;
+            margin-left: 5px;
+        }
+        .keywords {
+            font-size: 14px;
+            color: #666;
             margin-bottom: 10px;
-            color: #111;
         }
-        .reply-card p {
-            margin: 5px 0;
-        }
-        .actions {
-            margin-top: 15px;
-        }
-        .edit-btn, .delete-btn {
-            padding: 8px 14px;
+        .actions a {
+            padding: 6px 10px;
             border-radius: 5px;
+            font-size: 14px;
             text-decoration: none;
-            font-weight: bold;
-            margin-right: 10px;
+            margin-right: 8px;
         }
         .edit-btn {
             background: #2563eb;
@@ -351,9 +361,61 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
             color: #fff;
         }
     </style>
+
+    <script>
+        const list = document.getElementById('replyList');
+        let dragged;
+
+        // Drag start
+        list.addEventListener('dragstart', (e) => {
+            dragged = e.target;
+            e.target.style.opacity = 0.5;
+        });
+
+        // Drag over
+        list.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const after = [...list.children].find(el => e.clientY < el.getBoundingClientRect().top + el.offsetHeight / 2);
+            if (after == null) {
+                list.appendChild(dragged);
+            } else {
+                list.insertBefore(dragged, after);
+            }
+        });
+
+        list.addEventListener('dragend', () => {
+            dragged.style.opacity = 1;
+            const ids = [...list.children].map((el, i) => ({ id: el.dataset.id, priority: list.children.length - i }));
+            fetch('/api/update-priorities', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ updates: ids })
+            });
+        });
+
+        // Click to set priority manually
+        list.addEventListener('click', (e) => {
+            const item = e.target.closest('li.reply-item');
+            if (!item) return;
+            const input = prompt('Enter new priority number (1 = top)');
+            if (!input || isNaN(input)) return;
+
+            const newPos = parseInt(input);
+            const total = list.children.length;
+            if (newPos < 1 || newPos > total) return alert('Invalid position');
+
+            list.insertBefore(item, list.children[total - newPos]);
+            const ids = [...list.children].map((el, i) => ({ id: el.dataset.id, priority: list.children.length - i }));
+            fetch('/api/update-priorities', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ updates: ids })
+            });
+        });
+    </script>
     `;
 
-    res.send(getHtmlTemplate('Chat Reply List', html));
+    res.send(getHtmlTemplate('Chat Reply List', content));
 });
 
 // EDIT REPLY
@@ -464,6 +526,21 @@ function handleReplySend(replyObj) {
 app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
     await ChatReply.findByIdAndDelete(req.params.id);
     res.redirect('/admin/reply-list');
+});
+
+app.post('/api/update-priorities', async (req, res) => {
+    const { updates } = req.body;
+    if (!Array.isArray(updates)) return res.status(400).json({ message: 'Invalid data' });
+
+    try {
+        for (const item of updates) {
+            await ChatReply.findByIdAndUpdate(item.id, { priority: item.priority });
+        }
+        res.json({ message: 'Priorities updated' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 // START
