@@ -45,8 +45,8 @@ const ChatReplySchema = new mongoose.Schema({
 });
 const ChatReply = mongoose.model('ChatReply', ChatReplySchema);
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
+app.use(bodyParser.json({ limit: '100mb' }));
 app.use(session({
     secret: 'MySuperStrongSecretKey!',
     resave: false,
