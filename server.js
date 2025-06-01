@@ -376,16 +376,16 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
         dragged.style.opacity = 0.5;
 });
 
-        // Drag over
-        list.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const after = [...list.children].find(el => e.clientY < el.getBoundingClientRect().top + el.offsetHeight / 2);
-            if (after == null) {
-                list.appendChild(dragged);
-            } else {
-                list.insertBefore(dragged, after);
-            }
-        });
+         // Drag over
+    list.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const after = [...list.children].find(el => e.clientY < el.getBoundingClientRect().top + el.offsetHeight / 2);
+        if (after == null) {
+            list.appendChild(dragged);
+        } else {
+            list.insertBefore(dragged, after);
+        }
+    });
 
         list.addEventListener('dragend', () => {
             dragged.style.opacity = 1;
