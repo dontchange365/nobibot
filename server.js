@@ -333,10 +333,10 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
             try {
                 const response = await fetch('/api/custom-variables'); // New API endpoint to fetch custom variables
                 const customVars = await response.json();
-                allVariables = [
-                    ...defaultVariables,
-                    ...customVars.map(v => ({ name: `%${v.name}%`, type: 'Custom', value: v.value }))
-                ];
+                allVariables = defaultVariables;
+customVars.forEach(v => {
+  allVariables.push({ name: `%${v.name}%`, type: 'Custom', value: v.value });
+});
                 displayVariables(allVariables);
             } catch (error) {
                 console.error('Error loading variables:', error);
