@@ -1,75 +1,41 @@
-// server.js
-
-// --- 1. Import necessary modules ---
 const express = require('express');
 const bodyParser = require('body-parser');
-const session = require('express-session'); // For managing user sessions
-const path = require('path'); // For serving static files
+const session = require('express-session');
+const path = require('path');
+const bcrypt = require('bcryptjs');
+const Admin = require('./models/Admin'); // Adjust path as per your project structure
 
-// --- 2. Initialize the Express application ---
 const app = express();
-const PORT = process.env.PORT || 3000; // Define the port for the server
+const PORT = process.env.PORT || 3000;
 
-// --- 3. Middleware Setup ---
-
-// Parse URL-encoded bodies (for form data submitted via POST)
-// This is needed to access form data like username and password from req.body
 app.use(bodyParser.urlencoded({ extended: true }));
-
-// Parse JSON bodies (if you were sending JSON data to your server)
 app.use(bodyParser.json());
 
-// Setup sessions:
-// This middleware manages user sessions, allowing the server to remember logged-in users.
 app.use(session({
-    // 'secret' is used to sign the session ID cookie.
-    // **IMPORTANT**: Change this to a long, random, and unguessable string in a real application!
-    secret: 'your_super_secret_key_1234567890abcdef', // <<< --- **CHANGE THIS!**
-    resave: false, // Don't save session if unmodified
-    saveUninitialized: false, // Don't create session until something is stored
-    cookie: { maxAge: 1000 * 60 * 60 * 24 } // Session cookie will expire after 24 hours (in milliseconds)
+    secret: process.env.SESSION_SECRET || 'a_very_secret_key_that_you_should_change_and_make_long_and_random',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 1000 * 60 * 60 * 24, secure: process.env.NODE_ENV === 'production' }
 }));
 
-// Serve static files:
-// This tells Express to serve files from the 'public' directory.
-// For example, if you have 'public/style.css', it can be accessed at '/style.css'.
-// (Though in this example, the HTML is embedded, this is good practice for future expansion).
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- 4. Hardcoded Admin Credentials (FOR DEMONSTRATION ONLY!) ---
-// **SECURITY WARNING**:
-// In a real-world application, NEVER store passwords in plain text like this.
-// You MUST use a strong password hashing library like 'bcrypt' to hash and store passwords securely
-// in a database. Then, when a user logs in, you compare the entered password with the stored hash.
-const ADMIN_USERNAME = 'samshaad365';
-const ADMIN_PASSWORD = 'shizuka123'; // <<< --- **NEVER DO THIS IN PRODUCTION!**
-
-// --- 5. Custom Middleware for Authentication ---
-// This function checks if the user is logged in (i.e., if req.session.loggedIn is true).
-// If not logged in, it redirects them to the login page.
 function isAuthenticated(req, res, next) {
     if (req.session.loggedIn) {
-        next(); // User is authenticated, proceed to the next route handler
+        next();
     } else {
-        res.redirect('/login'); // Not logged in, redirect to login page
+        res.redirect('/admin/login');
     }
 }
 
-// --- 6. Routes ---
-
-// Default Route: Redirects to the login page
 app.get('/', (req, res) => {
-    res.redirect('/login');
+    res.redirect('/admin/login');
 });
 
-// Login Page Route (GET request): Displays the login form
-app.get('/login', (req, res) => {
-    // If the user is already logged in, redirect them directly to the admin panel
+app.get('/admin/login', (req, res) => {
     if (req.session.loggedIn) {
-        return res.redirect('/admin');
+        return res.redirect('/admin/dashboard');
     }
-
-    // Send the HTML for the login form
     res.send(`
         <!DOCTYPE html>
         <html lang="en">
@@ -92,7 +58,7 @@ app.get('/login', (req, res) => {
             <div class="login-container">
                 <h2>Admin Login</h2>
                 ${req.query.error ? '<p class="error">Invalid username or password.</p>' : ''}
-                <form action="/login" method="POST">
+                <form action="/admin/login" method="POST">
                     <label for="username">Username:</label>
                     <input type="text" id="username" name="username" required><br>
                     <label for="password">Password:</label>
@@ -105,25 +71,31 @@ app.get('/login', (req, res) => {
     `);
 });
 
-// Login POST Route: Handles login form submission
-app.post('/login', (req, res) => {
-    const { username, password } = req.body; // Extract username and password from the form submission
+app.post('/admin/login', async (req, res) => {
+    const { username, password } = req.body;
 
-    // Check if the provided credentials match the hardcoded admin credentials
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        req.session.loggedIn = true; // Set a session variable to mark the user as logged in
-        req.session.username = username; // Store the username in the session
-        res.redirect('/admin'); // Redirect to the protected admin panel
-    } else {
-        // If credentials are incorrect, redirect back to the login page with an error flag
-        res.redirect('/login?error=true');
+    try {
+        const adminUser = await Admin.findOne({ username });
+        if (!adminUser) {
+            return res.redirect('/admin/login?error=true');
+        }
+
+        const isMatch = await adminUser.comparePassword(password);
+        if (!isMatch) {
+            return res.redirect('/admin/login?error=true');
+        }
+
+        req.session.loggedIn = true;
+        req.session.username = adminUser.username;
+        res.redirect('/admin/dashboard');
+
+    } catch (err) {
+        console.error('Login error:', err);
+        res.redirect('/admin/login?error=true');
     }
 });
 
-// Admin Panel Route (Protected): Only accessible after successful login
-app.get('/admin', isAuthenticated, (req, res) => {
-    // This route uses the 'isAuthenticated' middleware. If the user isn't logged in,
-    // they'll be redirected to /login before this code even runs.
+app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html lang="en">
@@ -144,27 +116,24 @@ app.get('/admin', isAuthenticated, (req, res) => {
             <div class="admin-container">
                 <h1>Welcome to the Admin Panel, ${req.session.username}!</h1>
                 <p>This is a protected area. You can manage your content here.</p>
-                <a href="/logout">Logout</a>
+                <a href="/admin/logout">Logout</a>
             </div>
         </body>
         </html>
     `);
 });
 
-// Logout Route: Destroys the user's session
-app.get('/logout', (req, res) => {
+app.get('/admin/logout', (req, res) => {
     req.session.destroy(err => {
         if (err) {
             console.error('Error destroying session:', err);
-            // If there's an error destroying the session, redirect back to admin or show error
-            return res.redirect('/admin');
+            return res.redirect('/admin/dashboard');
         }
-        res.redirect('/login'); // Redirect to login page after successful logout
+        res.redirect('/admin/login');
     });
 });
 
-// --- 7. Start the Server ---
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    console.log('Open your browser and go to http://localhost:3000 to access the login page.');
+    console.log('Open your browser and go to http://localhost:3000/admin/login to access the login page.');
 });
