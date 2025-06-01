@@ -105,7 +105,9 @@ app.post('/api/chatbot/message', async (req, res) => {
     try {
         // 1. Exact Match
         const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
+        if (exact) {
         return res.json({ reply: handleReplySend(exact) });
+    }
 
         // 2. Pattern Matching
         const patterns = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 });
