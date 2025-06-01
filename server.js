@@ -88,12 +88,25 @@ app.post('/api/chatbot/message', async (req, res) => {
     const userMessage = req.body.message;
     let botReply = "Sorry, I didn't understand that.";
 
+    // 🆕 First-time welcome
+    if (!req.session.seenWelcome) {
+        req.session.seenWelcome = true;
+        try {
+            const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
+            if (welcomeReply) {
+                return res.json({ reply: randomReply(welcomeReply.replies) });
+            }
+        } catch (e) {
+            console.error("Welcome message error:", e);
+        }
+    }
+
     try {
         // 1. Exact Match
         const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
         if (exact) return res.json({ reply: randomReply(exact.replies) });
 
-        // 2. Pattern Matching (comma keywords)
+        // 2. Pattern Matching
         const patterns = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 });
         for (const reply of patterns) {
             const keywords = reply.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
@@ -102,7 +115,7 @@ app.post('/api/chatbot/message', async (req, res) => {
             }
         }
 
-        // 3. Expert Regex
+        // 3. Regex Matching
         const regexMatches = await ChatReply.find({ type: 'expert_pattern_matching', pattern: { $ne: null } }).sort({ priority: -1 });
         for (const reply of regexMatches) {
             try {
@@ -112,7 +125,7 @@ app.post('/api/chatbot/message', async (req, res) => {
             } catch (e) { }
         }
 
-        // 4. Default
+        // 4. Default Fallback
         const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
         if (fallback) return res.json({ reply: randomReply(fallback.replies) });
 
