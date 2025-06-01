@@ -9,11 +9,14 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Set your MongoDB URI. It's recommended to use environment variables for this in production.
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://dontchange365:DtUiOMFzQVM0tG9l@nobifeedback.9ntuipc.mongodb.net/?retryWrites=true&w=majority&appName=nobifeedback';
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log('MongoDB Connected!'))
     .catch(err => console.error('MongoDB connection error:', err));
+
+// --- Mongoose Schemas ---
 
 // Admin Schema
 const AdminSchema = new mongoose.Schema({
@@ -45,18 +48,28 @@ const ChatReplySchema = new mongoose.Schema({
 });
 const ChatReply = mongoose.model('ChatReply', ChatReplySchema);
 
+// Custom Variable Schema
+const CustomVariableSchema = new mongoose.Schema({
+    name: { type: String, required: true, unique: true, trim: true },
+    value: { type: String, required: true }
+});
+const CustomVariable = mongoose.model('CustomVariable', CustomVariableSchema);
+
+// --- Express Middleware ---
 app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
 app.use(bodyParser.json({ limit: '100mb' }));
 app.use(session({
-    secret: 'MySuperStrongSecretKey!',
+    secret: process.env.SESSION_SECRET || 'MySuperStrongSecretKey!', // Use environment variable for secret
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: MONGO_URI }),
-    cookie: { maxAge: 24 * 60 * 60 * 1000 }
+    cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
 }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'))); // Serve static files from 'public' directory
 
-// Middleware
+// --- Helper Functions ---
+
+// Middleware to check if user is authenticated (admin)
 function isAuthenticated(req, res, next) {
     if (req.session.loggedIn) return next();
     return res.redirect('/admin/login');
@@ -80,8 +93,11 @@ function getHtmlTemplate(title, bodyContent) {
     `;
 }
 
+// Function to get a random reply from an array
+const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
 // --- Custom Replacements Logic ---
-function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSession = {}) {
+async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSession = {}) {
     if (!replyObj || !replyObj.replies || replyObj.replies.length === 0) return "No reply found";
 
     let replyText;
@@ -100,9 +116,9 @@ function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSe
     }
 
     const now = new Date();
-    // Using 'en-IN' locale for date and time formatting relevant to India
+    // Using 'en-IN' locale for date and time formatting relevant to India (Patna, Bihar)
     const optionsDate = { year: 'numeric', month: 'long', day: 'numeric' };
-    const optionsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }; // 2-digit for consistent hh:mm:ss
+    const optionsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
     const optionsHourShort = { hour: 'numeric', hour12: true };
     const optionsHour24 = { hour: '2-digit', hourCycle: 'h23' };
     const optionsHour24Short = { hour: 'numeric', hourCycle: 'h23' };
@@ -111,6 +127,21 @@ function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSe
     const optionsDayOfWeek = { weekday: 'long' };
     const optionsDayOfWeekShort = { weekday: 'short' };
 
+    // --- Custom Variable Replacements (PRIORITY: BEFORE other replacements) ---
+    try {
+        const customVariables = await CustomVariable.find({});
+        customVariables.forEach(variable => {
+            // Use a regex to replace all occurrences of %variable_name%
+            // Ensure variable name is valid for regex (no special chars)
+            const sanitizedName = variable.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`%${sanitizedName}%`, 'g');
+            replyText = replyText.replace(regex, variable.value);
+        });
+    } catch (error) {
+        console.error("Error fetching custom variables for replacement:", error);
+        // Continue with other replacements even if custom variables fail
+    }
+    // --- End Custom Variable Replacements ---
 
     // 1. Message variables
     replyText = replyText.replace(/%message%/g, userMessage || '');
@@ -124,13 +155,11 @@ function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSe
     }
 
     // 2. Name variables
-    // For now, assuming a default 'User' or a session username for demonstration
-    // In a real app, you'd get this from authenticated user data or a chat platform API
-    const userName = reqSession.username || 'User'; // If admin is logged in, use admin username
+    const userName = reqSession.username || 'User';
     replyText = replyText.replace(/%name%/g, userName);
     replyText = replyText.replace(/%first_name%/g, userName.split(' ')[0] || '');
-    replyText = replyText.replace(/%last_name%/g, userName.split(' ').slice(1).join(' ') || ''); // Gets everything after the first word
-    replyText = replyText.replace(/%chat_name%/g, userName); // Assuming chat name is same as user name for 1-1 chats
+    replyText = replyText.replace(/%last_name%/g, userName.split(' ').slice(1).join(' ') || '');
+    replyText = replyText.replace(/%chat_name%/g, userName);
 
     // 3. Date & Time variables
     replyText = replyText.replace(/%date%/g, now.toLocaleDateString('en-IN', optionsDate));
@@ -156,22 +185,12 @@ function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSe
     replyText = replyText.replace(/%day_of_week%/g, now.toLocaleDateString('en-IN', optionsDayOfWeek));
     replyText = replyText.replace(/%day_of_week_short%/g, now.toLocaleDateString('en-IN', optionsDayOfWeekShort));
 
-    // Day of year and Week of year (more complex, require external lib or careful calculation)
-    // For simplicity, I'll add placeholders or basic implementation.
-    // If you need exact Day of Year and Week of Year, consider a library like 'date-fns'.
-    // Placeholder for now:
+    // Day of year and Week of year (placeholders for now)
     replyText = replyText.replace(/%day_of_year%/g, 'N/A_DayOfYear');
     replyText = replyText.replace(/%week_of_year%/g, 'N/A_WeekOfYear');
 
-    // Countdown variables are complex due to Unix timestamp conversion and live updating.
-    // Skipping for now as they typically need frontend JS or more backend state management.
-
     // 4. AutoResponder variables
     replyText = replyText.replace(/%rule_id%/g, replyObj._id ? replyObj._id.toString() : 'N/A');
-
-    // Skipping app_name, app_version, app_url as they are mobile app specific.
-    // Skipping received_count, reply_count etc. as they require chat-specific state tracking for each user,
-    // which is more complex than simple session-based tracking.
 
     // 5. Random variables
     replyText = replyText.replace(/%rndm_num_(\d+)_(\d+)%/g, (match, min, max) => {
@@ -180,7 +199,7 @@ function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSe
 
     replyText = replyText.replace(/%rndm_custom_(\d+)_(.*?)%/g, (match, len, charSet) => {
         len = parseInt(len);
-        const chars = charSet.split(/,(?![^[]*\])/).map(s => s.trim()); // Splits by comma, but not inside [] (if any)
+        const chars = charSet.split(/,(?![^[]*\])/).map(s => s.trim());
         let result = '';
         for (let i = 0; i < len; i++) {
             result += chars[Math.floor(Math.random() * chars.length)];
@@ -213,20 +232,16 @@ function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSe
     replyText = replyText.replace(/%rndm_symbol_(\d+)%/g, (match, len) => generateRandomString(parseInt(len), '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'));
     replyText = replyText.replace(/%rndm_grawlix_(\d+)%/g, (match, len) => generateRandomString(parseInt(len), '#$%&@*!'));
 
-
-    // Skipping URL encoded and previous message/reply variables for now due to complexity in current setup.
-    // Skipping message processing time as it requires measuring execution time.
-
     return replyText;
 }
 
 
-// Routes
+// --- Public Routes ---
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-// CHATBOT API
+// --- Chatbot API Route ---
 app.post('/api/chatbot/message', async (req, res) => {
     const userMessage = req.body.message;
     let botReply = "Sorry, I didn't understand that.";
@@ -238,7 +253,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         try {
             const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
             if (welcomeReply) {
-                return res.json({ reply: handleReplySend(welcomeReply, userMessage, null, req.session) });
+                return res.json({ reply: await handleReplySend(welcomeReply, userMessage, null, req.session) }); // Await here
             }
         } catch (e) {
             console.error("Welcome message error:", e);
@@ -249,7 +264,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         // 1. Exact Match
         const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
         if (exact) {
-            return res.json({ reply: handleReplySend(exact, userMessage, null, req.session) });
+            return res.json({ reply: await handleReplySend(exact, userMessage, null, req.session) }); // Await here
         }
 
         // 2. Pattern Matching
@@ -257,7 +272,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         for (const reply of patterns) {
             const keywords = reply.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
             if (keywords.some(k => userMessage.toLowerCase().includes(k))) {
-                return res.json({ reply: handleReplySend(reply, userMessage, null, req.session) });
+                return res.json({ reply: await handleReplySend(reply, userMessage, null, req.session) }); // Await here
             }
         }
 
@@ -269,7 +284,7 @@ app.post('/api/chatbot/message', async (req, res) => {
                 const match = regex.exec(userMessage);
                 if (match) {
                     matchedRegexGroups = match; // Store groups for replacement
-                    return res.json({ reply: handleReplySend(reply, userMessage, matchedRegexGroups, req.session) });
+                    return res.json({ reply: await handleReplySend(reply, userMessage, matchedRegexGroups, req.session) }); // Await here
                 }
             } catch (e) {
                 console.error("Regex pattern error:", e);
@@ -278,7 +293,7 @@ app.post('/api/chatbot/message', async (req, res) => {
 
         // 4. Default Fallback
         const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
-        if (fallback) return res.json({ reply: handleReplySend(fallback, userMessage, null, req.session) });
+        if (fallback) return res.json({ reply: await handleReplySend(fallback, userMessage, null, req.session) }); // Await here
 
     } catch (e) {
         console.error(e);
@@ -287,7 +302,9 @@ app.post('/api/chatbot/message', async (req, res) => {
 
     res.json({ reply: botReply });
 });
-const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+
+// --- Admin Routes ---
 
 // ADMIN LOGIN
 app.get('/admin/login', (req, res) => {
@@ -323,6 +340,7 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
         <div class="admin-links">
             <a href="/admin/add-chat-replies">Add Chat Reply</a>
             <a href="/admin/reply-list">View Replies</a>
+            <a href="/admin/custom-variables">Manage Custom Variables</a>
             <a href="/admin/logout">Logout</a>
         </div>`;
     res.send(getHtmlTemplate('Admin Dashboard', dashboardContent));
@@ -334,7 +352,18 @@ app.get('/admin/logout', (req, res) => {
 });
 
 // ADD REPLY FORM
-app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
+app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
+    let customVarList = '';
+    try {
+        const customVariables = await CustomVariable.find({});
+        customVarList = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
+        if (customVarList) {
+            customVarList = `<br>**Custom Variables:** ${customVarList}`;
+        }
+    } catch (e) {
+        console.error("Error fetching custom variables for form:", e);
+    }
+
     const addReplyForm = `
     <form method="POST" action="/admin/add-chat-replies" id="replyForm">
         <label for="ruleName">Rule Name:</label>
@@ -375,6 +404,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
             **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
             **AutoResponder:** %rule_id%<br>
             **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
+            ${customVarList}
         </small>
 
         <label for="priority">Priority:</label>
@@ -423,6 +453,7 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     if (!replies) return res.send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>'));
 
+    // If setting a new default message, unset existing ones
     if (type === 'default_message' && isDefault === 'true') {
         await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
     }
@@ -601,6 +632,18 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     if (!r) {
         return res.send(getHtmlTemplate('Error', '<p>Reply not found.</p><br><a href="/admin/reply-list">Back to Reply List</a>'));
     }
+
+    let customVarList = '';
+    try {
+        const customVariables = await CustomVariable.find({});
+        customVarList = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
+        if (customVarList) {
+            customVarList = `<br>**Custom Variables:** ${customVarList}`;
+        }
+    } catch (e) {
+        console.error("Error fetching custom variables for form:", e);
+    }
+
     const editReplyForm = `
     <form method="POST" action="/admin/edit-reply/${r._id}">
         <label for="ruleName">Rule Name:</label>
@@ -634,6 +677,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
             **AutoResponder:** %rule_id%<br>
             **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
+            ${customVarList}
         </small>
 
         <label for="priority">Priority:</label>
@@ -686,27 +730,31 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     isDefault: isDefault === 'true',
     sendMethod: sendMethod || 'random'
 };
+    // If setting this as the default message, unset existing ones of the same type
     if (update.isDefault) {
-        await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
+        // Only unset other default_message types if this one is default
+        await ChatReply.updateMany({ type: 'default_message', _id: { $ne: req.params.id } }, { isDefault: false });
     }
     await ChatReply.findByIdAndUpdate(req.params.id, update);
     res.redirect('/admin/reply-list');
 });
 
-// DELETE
+// DELETE REPLY
 app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
     await ChatReply.findByIdAndDelete(req.params.id);
     res.redirect('/admin/reply-list');
 });
 
-app.post('/api/update-priorities', async (req, res) => {
+// API for updating priorities (used by drag-and-drop)
+app.post('/api/update-priorities', isAuthenticated, async (req, res) => {
     const { updates } = req.body;
     if (!Array.isArray(updates)) return res.status(400).json({ message: 'Invalid data' });
 
     try {
-        for (const item of updates) {
-            await ChatReply.findByIdAndUpdate(item.id, { priority: item.priority });
-        }
+        // Use Promise.all for concurrent updates
+        await Promise.all(updates.map(item =>
+            ChatReply.findByIdAndUpdate(item.id, { priority: item.priority })
+        ));
         res.json({ message: 'Priorities updated' });
     } catch (err) {
         console.error('Error updating priorities:', err);
@@ -714,7 +762,184 @@ app.post('/api/update-priorities', async (req, res) => {
     }
 });
 
-// START
+--- Custom Variables Management ---
+
+// GET: Display list of custom variables
+app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
+    try {
+        const variables = await CustomVariable.find({});
+        const listItems = variables.map(v => `
+            <li class="variable-item">
+                <div class="variable-name"><code>%${v.name}%</code></div>
+                <div class="variable-value">${v.value.slice(0, 80)}${v.value.length > 80 ? '...' : ''}</div>
+                <div class="actions">
+                    <a href="/admin/edit-variable/${v._id}" class="edit-btn">✏️</a>
+                    <a href="/admin/delete-variable/${v._id}" class="delete-btn" onclick="return confirm('Delete this variable?')">🗑️</a>
+                </div>
+            </li>
+        `).join('');
+
+        const content = `
+            <h2>✨ Custom Chat Variables</h2>
+            <div class="admin-links">
+                <a href="/admin/add-variable">Add New Variable</a>
+                <a href="/admin/dashboard">← Back to Dashboard</a>
+            </div>
+            ${variables.length > 0 ? `<ul class="variable-list">${listItems}</ul>` : '<p>No custom variables found. Add one!</p>'}
+
+
+            <style>
+                .variable-list {
+                    list-style: none;
+                    padding: 0;
+                    margin: 20px 0;
+                }
+                .variable-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    background: #fff;
+                    padding: 15px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+                    margin-bottom: 10px;
+                    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+                }
+                .variable-name {
+                    font-weight: bold;
+                    color: #007bff;
+                    flex: 0 0 200px; /* Fixed width, but can shrink */
+                    word-break: break-all; /* Break long names */
+                }
+                .variable-value {
+                    flex-grow: 1;
+                    margin-right: 20px;
+                    color: #555;
+                    word-break: break-all; /* Break long values */
+                }
+                .variable-item .actions {
+                    flex-shrink: 0;
+                    display: flex;
+                    gap: 8px;
+                    margin-top: 5px; /* Add some space on wrap */
+                }
+                 @media (max-width: 600px) {
+                    .variable-item {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+                    .variable-name, .variable-value {
+                        width: 100%;
+                        margin-right: 0;
+                        margin-bottom: 5px;
+                    }
+                    .variable-item .actions {
+                        width: 100%;
+                        justify-content: flex-end;
+                    }
+                }
+            </style>
+        `;
+        res.send(getHtmlTemplate('Custom Variables', content));
+    } catch (error) {
+        console.error("Error fetching custom variables:", error);
+        res.send(getHtmlTemplate('Error', '<p>Error loading custom variables.</p><br><a href="/admin/dashboard">Back to Dashboard</a>'));
+    }
+});
+
+// GET: Add new variable form
+app.get('/admin/add-variable', isAuthenticated, (req, res) => {
+    const addVariableForm = `
+        <form method="POST" action="/admin/add-variable">
+            <h2>Add New Custom Variable</h2>
+            <label for="name">Variable Name (e.g., my_product_name):</label>
+            <input name="name" id="name" placeholder="No spaces, use underscores. Will be used as %name%" required />
+            <small>This name will be wrapped in '%' characters in your replies, e.g., %my_product_name%</small>
+            <label for="value">Variable Value:</label>
+            <textarea name="value" id="value" required></textarea>
+            <button type="submit">Add Variable</button>
+        </form>
+        <br>
+        <a href="/admin/custom-variables">← Back to Custom Variables</a>
+    `;
+    res.send(getHtmlTemplate('Add Variable', addVariableForm));
+});
+
+// POST: Handle adding new variable
+app.post('/admin/add-variable', isAuthenticated, async (req, res) => {
+    const { name, value } = req.body;
+    if (!name || !value) {
+        return res.send(getHtmlTemplate('Error', '<p>Variable name and value are required.</p><br><a href="/admin/add-variable">Back to Add Variable</a>'));
+    }
+    // Basic validation for variable name (e.g., no spaces, only alphanumeric and underscores)
+    if (!/^[a-zA-Z0-9_]+$/.test(name)) {
+        return res.send(getHtmlTemplate('Error', '<p>Variable name must contain only alphanumeric characters and underscores (no spaces).</p><br><a href="/admin/add-variable">Back to Add Variable</a>'));
+    }
+
+    try {
+        const newVariable = new CustomVariable({ name: name.trim(), value: value.trim() });
+        await newVariable.save();
+        res.redirect('/admin/custom-variables');
+    } catch (error) {
+        if (error.code === 11000) { // Duplicate key error
+            return res.send(getHtmlTemplate('Error', '<p>A variable with this name already exists.</p><br><a href="/admin/add-variable">Back to Add Variable</a>'));
+        }
+        console.error("Error adding variable:", error);
+        res.send(getHtmlTemplate('Error', '<p>Error adding custom variable.</p><br><a href="/admin/add-variable">Back to Add Variable</a>'));
+    }
+});
+
+// GET: Edit variable form
+app.get('/admin/edit-variable/:id', isAuthenticated, async (req, res) => {
+    try {
+        const variable = await CustomVariable.findById(req.params.id);
+        if (!variable) {
+            return res.send(getHtmlTemplate('Error', '<p>Variable not found.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+        }
+        const editVariableForm = `
+            <form method="POST" action="/admin/edit-variable/${variable._id}">
+                <h2>Edit Custom Variable</h2>
+                <label for="name">Variable Name (read-only):</label>
+                <input name="name" id="name" value="${variable.name}" readonly />
+                <label for="value">Variable Value:</label>
+                <textarea name="value" id="value" required>${variable.value}</textarea>
+                <button type="submit">Update Variable</button>
+            </form>
+            <br>
+            <a href="/admin/custom-variables">← Back to Custom Variables</a>
+        `;
+        res.send(getHtmlTemplate('Edit Variable', editVariableForm));
+    } catch (error) {
+        console.error("Error fetching variable for edit:", error);
+        res.send(getHtmlTemplate('Error', '<p>Error loading variable for editing.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+    }
+});
+
+// POST: Handle updating variable
+app.post('/admin/edit-variable/:id', isAuthenticated, async (req, res) => {
+    const { value } = req.body;
+    try {
+        await CustomVariable.findByIdAndUpdate(req.params.id, { value: value.trim() });
+        res.redirect('/admin/custom-variables');
+    } catch (error) {
+        console.error("Error updating variable:", error);
+        res.send(getHtmlTemplate('Error', '<p>Error updating custom variable.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+    }
+});
+
+// GET: Delete variable
+app.get('/admin/delete-variable/:id', isAuthenticated, async (req, res) => {
+    try {
+        await CustomVariable.findByIdAndDelete(req.params.id);
+        res.redirect('/admin/custom-variables');
+    } catch (error) {
+        console.error("Error deleting variable:", error);
+        res.send(getHtmlTemplate('Error', '<p>Error deleting custom variable.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+    }
+});
+
+
+// --- Server Start ---
 app.listen(PORT, () => {
     console.log(`NOBITA Bot Server Running @ http://localhost:${PORT}`);
 });
