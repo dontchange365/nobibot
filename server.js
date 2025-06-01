@@ -762,7 +762,7 @@ app.post('/api/update-priorities', isAuthenticated, async (req, res) => {
     }
 });
 
---- Custom Variables Management ---
+// --- Custom Variables Management Routes ---
 
 // GET: Display list of custom variables
 app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
@@ -943,3 +943,4 @@ app.get('/admin/delete-variable/:id', isAuthenticated, async (req, res) => {
 app.listen(PORT, () => {
     console.log(`NOBITA Bot Server Running @ http://localhost:${PORT}`);
 });
+
