@@ -371,9 +371,10 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
 
         // Drag start
         list.addEventListener('dragstart', (e) => {
-            dragged = e.target;
-            e.target.style.opacity = 0.5;
-        });
+        dragged = e.target.closest('li.reply-item');
+        if (!dragged) return;
+        dragged.style.opacity = 0.5;
+});
 
         // Drag over
         list.addEventListener('dragover', (e) => {
