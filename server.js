@@ -407,7 +407,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
 
                     <label for="replies">Reply Lines:</label>
                     <textarea id="replies" name="replies" placeholder="Enter multiple reply lines, separated by <#> (e.g., Hello! How can I help? <#> Hi there! Ask me anything.)" required></textarea>
-                    <p class="info">Separate multiple reply lines using `&lt;#&gt;`. One random line will be chosen.</p>
+                    <p class="info">Separate multiple reply lines using '&lt;#&gt;'. One random line will be chosen.</p>
 
                     <label for="priority">Priority (Higher number = higher priority):</label>
                     <input type="number" id="priority" name="priority" value="0">
