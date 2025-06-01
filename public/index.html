@@ -3,255 +3,229 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Insta-Chat</title>
+    <title>Nobi Bot Chat</title>
     <style>
-        /* Basic Reset & Font */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background-color: #fafafa; /* Instagram background */
-            color: #262626; /* Instagram text color */
-        }
-
-        /* Chat Container */
-        .chat-container {
-            width: 100%;
-            max-width: 450px; /* Typical mobile chat width */
-            height: 90vh; /* Make it almost full height */
-            background-color: #fff;
-            border: 1px solid #dbdbdb; /* Subtle border */
-            border-radius: 8px;
+            background-color: #000; /* Dark background like Instagram chat */
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+            height: 100vh;
+            overflow: hidden; /* Prevent body scroll */
         }
 
-        /* Chat Header (Top Bar) */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 420px; /* Mobile-like width */
+            margin: 0 auto;
+            height: 100%;
+            background-color: #000; /* Dark background for container */
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1); /* Subtle white shadow for dark theme */
+            color: #fff; /* Default text color for dark theme */
+        }
+
         .chat-header {
+            background-color: #1a1a1a; /* Darker header */
+            padding: 12px 15px;
+            border-bottom: 1px solid #333; /* Darker border */
             display: flex;
             align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid #efefef; /* Lighter border */
-            background-color: #fff;
+            justify-content: space-between;
             font-weight: 600;
-            font-size: 16px;
-            color: #262626;
+            font-size: 1.1em;
+            color: #fff;
             position: sticky;
             top: 0;
             z-index: 10;
         }
-        .chat-header .back-icon {
-            font-size: 24px;
-            margin-right: 15px;
-            cursor: pointer;
-            color: #262626;
-        }
-        .chat-header .profile-pic {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            object-fit: cover;
-            margin-right: 10px;
-        }
-        .chat-header .username {
-            flex-grow: 1; /* Pushes icons to the right */
-        }
-        .chat-header .header-icons span {
-            font-size: 22px;
-            margin-left: 20px;
-            cursor: pointer;
-            color: #262626;
-        }
 
-        /* Chat Messages Area */
-        .chat-messages {
-            flex-grow: 1;
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column; /* Messages stack vertically */
-            gap: 8px; /* Space between messages */
-            background-color: #fafafa; /* Light background for chat area */
-        }
-        .message {
-            max-width: 75%; /* Messages don't take full width */
-            padding: 10px 14px;
-            border-radius: 20px; /* Rounded corners like Insta */
-            word-wrap: break-word; /* Prevents long words from breaking layout */
-            line-height: 1.4;
-            font-size: 15px;
-        }
-        .message.user {
-            background-color: #e0f2fe; /* Light blue, similar to Insta's send bubble */
-            color: #262626;
-            align-self: flex-end; /* Align to right */
-            border-bottom-right-radius: 4px; /* Slightly less rounded on one corner */
-        }
-        .message.bot { /* Assuming 'bot' is like the other person */
-            background-color: #efefef; /* Light grey for incoming */
-            color: #262626;
-            align-self: flex-start; /* Align to left */
-            border-bottom-left-radius: 4px; /* Slightly less rounded on one corner */
-        }
-
-        /* Chat Input Area */
-        .chat-input {
+        .chat-header .profile-section {
             display: flex;
             align-items: center;
-            padding: 10px 15px;
-            border-top: 1px solid #efefef;
-            background-color: #fff;
-            gap: 10px; /* Space between input and button */
-        }
-        .chat-input .emoji-icon, .chat-input .gallery-icon, .chat-input .mic-icon {
-            font-size: 24px;
-            color: #8e8e8e; /* Lighter grey for icons */
-            cursor: pointer;
-        }
-        .chat-input input {
-            flex-grow: 1;
-            padding: 10px 15px;
-            border: 1px solid #dbdbdb;
-            border-radius: 20px; /* Rounded input field */
-            outline: none;
-            font-size: 15px;
-            background-color: #fafafa; /* Light background for input */
-        }
-        .chat-input button {
-            background: none;
-            border: none;
-            color: #0095f6; /* Instagram blue for Send */
-            font-weight: 600;
-            font-size: 15px;
-            cursor: pointer;
-            padding: 0 10px;
-        }
-        .chat-input button:disabled {
-            color: #b2dffc; /* Lighter blue when disabled */
-            cursor: not-allowed;
         }
 
-        /* Responsive Adjustments */
-        @media (max-width: 600px) {
-            .chat-container {
-                height: 100vh; /* Full height on smaller screens */
-                border-radius: 0;
-                border: none;
-            }
+        .profile-pic {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            margin-right: 10px;
+            object-fit: cover;
+            border: 1px solid #555; /* Slightly visible border for dark theme */
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            /* Scrollbar styling for a cleaner look */
+            scrollbar-width: thin; /* Firefox */
+            scrollbar-color: #555 transparent; /* Firefox dark scrollbar */
+        }
+        .chat-messages::-webkit-scrollbar {
+            width: 8px; /* Webkit */
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background-color: #555; /* Webkit dark scrollbar */
+            border-radius: 10px;
+        }
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent; /* Webkit */
+        }
+
+        .message {
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            border-radius: 18px; /* More rounded bubbles */
+            max-width: 80%; /* Messages don't span full width */
+            word-wrap: break-word; /* Break long words */
+            line-height: 1.4;
+        }
+
+        .sent {
+            background-color: #8a3ab9; /* Instagram purple gradient like */
+            align-self: flex-end;
+            margin-left: auto; /* Push to right */
+            color: #fff;
+            /* No bottom-right radius for a clean look, like original image */
+        }
+
+        .received {
+            background-color: #333; /* Darker grey for received messages */
+            align-self: flex-start;
+            margin-right: auto; /* Push to left */
+            color: #fff;
+            /* No bottom-left radius for a clean look, like original image */
+        }
+
+        .chat-input-area {
+            background-color: #1a1a1a; /* Darker input area background */
+            padding: 10px 15px;
+            border-top: 1px solid #333; /* Darker border */
+            display: flex;
+            align-items: center;
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
+        }
+
+        #message-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid #555; /* Darker input border */
+            border-radius: 24px; /* Rounded input */
+            margin-right: 10px;
+            font-size: 1em;
+            outline: none;
+            background-color: #333; /* Dark input field background */
+            color: #fff; /* White text in input */
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        #message-input::placeholder {
+            color: #bbb; /* Lighter placeholder text */
+        }
+
+        #send-button {
+            padding: 10px 20px;
+            background-color: #0095f6; /* Instagram blue */
+            color: white;
+            border: none;
+            border-radius: 24px; /* Rounded button */
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+
+        #send-button:hover {
+            background-color: #0074cc;
         }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <span class="back-icon"><i class="fas fa-arrow-left"></i></span>
-            <img src="https://via.placeholder.com/36" alt="Profile" class="profile-pic">
-            <span class="username">My Chatbot</span>
-            <div class="header-icons">
-                <span><i class="fas fa-video"></i></span>
-                <span><i class="fas fa-phone-alt"></i></span>
+            <div class="profile-section">
+                <img id="profile-pic" class="profile-pic" alt="Nobi Bot Profile Picture">
+                <span>Nobi Bot</span>
             </div>
         </div>
 
-        <div class="chat-messages" id="chat-messages">
-            <div class="message bot">Hello! I'm your Insta-inspired chatbot.</div>
-            <div class="message bot">Type something to get a reply.</div>
-        </div>
+        <div id="chat-messages" class="chat-messages">
+            </div>
 
-        <div class="chat-input">
-            <span class="emoji-icon"><i class="far fa-smile"></i></span>
+        <div class="chat-input-area">
             <input type="text" id="message-input" placeholder="Message...">
-            <span class="gallery-icon"><i class="far fa-image"></i></span>
-            <span class="mic-icon"><i class="fas fa-microphone"></i></span>
-            <button id="send-button" disabled>Send</button>
+            <button id="send-button">Send</button>
         </div>
     </div>
 
     <script>
+        const chatMessages = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
-        const chatMessages = document.getElementById('chat-messages');
+        const profilePic = document.getElementById('profile-pic');
 
-        // Function to display a message in the chat UI
-        function displayMessage(text, sender) {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message', sender); // 'user' or 'bot'
-            messageDiv.textContent = text;
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
-        }
+        // Nobi Bot DP URL (Provided by user)
+        // Using the direct image link from the ibb.co page (right-click -> "Open image in new tab" to get this type of URL).
+        profilePic.src = 'https://i.ibb.co/Q3pRXBy/Nobi-Bot-DP.jpg'; 
 
-        // Function to send a message to the server (your Node.js backend)
-        async function sendMessage() {
-            const text = messageInput.value.trim();
-            if (text === '') return; // Don't send empty messages
-
-            displayMessage(text, 'user'); // Display user's message instantly
-            messageInput.value = ''; // Clear the input field
-            sendButton.disabled = true; // Disable send button temporarily
-
-            try {
-                // Send message to your server's API
-                const response = await fetch('/api/message', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ text })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    // Display the bot's reply received from the server
-                    displayMessage(data.botMessage.text, 'bot');
-                } else {
-                    console.error('Server error:', data.error);
-                    displayMessage('Error: Could not get a reply. Try again later.', 'bot');
-                }
-            } catch (error) {
-                console.error('Network error:', error);
-                displayMessage('Error: Could not connect to the server. Check your connection.', 'bot');
-            } finally {
-                sendButton.disabled = messageInput.value.trim() === ''; // Re-enable if input has text
-            }
-        }
-
-        // Enable/disable send button based on input field content
-        messageInput.addEventListener('input', () => {
-            sendButton.disabled = messageInput.value.trim() === '';
-        });
-
-        // Event Listeners
         sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !sendButton.disabled) { // Send on Enter key if not disabled
+        messageInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
                 sendMessage();
             }
         });
 
-        // Optional: Load chat history when the page loads
-        async function loadChatHistory() {
-            try {
-                const response = await fetch('/api/messages');
-                const messages = await response.json();
-                if (response.ok) {
-                    messages.forEach(msg => displayMessage(msg.text, msg.sender));
-                } else {
-                    console.error('Error loading history:', messages.error);
-                }
-            } catch (error) {
-                console.error('Network error loading history:', error);
-            }
+        // Function to display a message in the chat
+        function displayMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender);
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to the latest message
         }
 
-        loadChatHistory(); // Call this when the page loads
+        // Send an initial welcome message from Nobi Bot
+        displayMessage("Hi there! I'm Nobi Bot. How can I help you today?", 'received');
+
+        // Function to send message to server and get reply
+        async function sendMessage() {
+            const messageText = messageInput.value.trim();
+            if (messageText) {
+                displayMessage(messageText, 'sent'); // Display user's message
+                messageInput.value = ''; // Clear input
+
+                try {
+                    // Send message to your server's /api/chatbot/message endpoint
+                    const response = await fetch('/api/chatbot/message', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ message: messageText }),
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Display Nobi Bot's reply
+                        displayMessage(data.reply, 'received');
+                    } else {
+                        // Handle server errors
+                        displayMessage('Nobi Bot: Sorry, I am having trouble connecting.', 'received');
+                    }
+                } catch (error) {
+                    // Handle network errors
+                    console.error('Network error:', error);
+                    displayMessage('Nobi Bot: Network issue. Please check your connection.', 'received');
+                }
+            }
+        }
     </script>
 </body>
 </html>
