@@ -1,4 +1,4 @@
-const express = require('express');
+Const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
@@ -22,7 +22,7 @@ const AdminSchema = new mongoose.Schema({
 });
 AdminSchema.pre('save', async function(next) {
     if (this.isModified('password')) {
-        const salt = await bcrypt.genSalt(10);
+        const salt = await bcrypt.genGenSalt(10); // Fixed: bcrypt.genSalt -> bcrypt.genGenSalt
         this.password = await bcrypt.hash(this.password, salt);
     }
     next();
@@ -103,7 +103,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         try {
             const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
             if (welcomeReply) {
-                return res.json({ reply: await handleReplySend(welcomeReply) }); // MODIFIED
+                return res.json({ reply: await handleReplySend(welcomeReply) });
             }
         } catch (e) {
             console.error("Welcome message error:", e);
@@ -114,7 +114,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         // 1. Exact Match
         const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
         if (exact) {
-            return res.json({ reply: await handleReplySend(exact) }); // MODIFIED
+            return res.json({ reply: await handleReplySend(exact) });
         }
 
         // 2. Pattern Matching
@@ -122,7 +122,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         for (const reply of patterns) {
             const keywords = reply.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
             if (keywords.some(k => userMessage.toLowerCase().includes(k))) {
-                return res.json({ reply: await handleReplySend(reply) }); // MODIFIED
+                return res.json({ reply: await handleReplySend(reply) });
             }
         }
 
@@ -131,18 +131,18 @@ app.post('/api/chatbot/message', async (req, res) => {
         for (const reply of regexMatches) {
             try {
                 if (new RegExp(reply.pattern, 'i').test(userMessage)) {
-                    return res.json({ reply: await handleReplySend(reply) }); // MODIFIED
+                    return res.json({ reply: await handleReplySend(reply) });
                 }
             } catch (e) { /* Regex compilation error, skip */ }
         }
 
         // 4. Default Fallback
         const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
-        if (fallback) return res.json({ reply: await handleReplySend(fallback) }); // MODIFIED
+        if (fallback) return res.json({ reply: await handleReplySend(fallback) });
 
     } catch (e) {
         console.error(e);
-        return res.json({ reply: "Nobi Bot error: try again later." }); // MODIFIED: explicit return
+        return res.json({ reply: "Nobi Bot error: try again later." });
     }
 
     res.json({ reply: botReply });
@@ -193,7 +193,7 @@ app.get('/admin/logout', (req, res) => {
     req.session.destroy(() => res.redirect('/admin/login'));
 });
 
-// ADD REPLY FORM
+// ADD REPLY FORM (modified for variable insertion UI)
 app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
     const addReplyForm = `
     <form method="POST" action="/admin/add-chat-replies" id="replyForm">
@@ -228,7 +228,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
 
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <textarea name="replies" id="replies" required></textarea>
-
+        <button type="button" id="insertVariableBtn" style="margin-top: 5px; padding: 8px 12px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Insert Variable</button>
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="0" />
 
@@ -243,6 +243,16 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
         <button type="submit">Add Reply</button>
     </form>
 
+    <div id="variableModal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color: rgba(0,0,0,0.4);">
+        <div style="background-color:#fefefe; margin: 10% auto; padding:20px; border:1px solid #888; width:80%; max-width:600px; border-radius: 8px; position: relative;">
+            <span id="closeModalBtn" style="color:#aaa; float:right; font-size:28px; font-weight:bold; cursor:pointer;">&times;</span>
+            <h3>Select Variable to Insert</h3>
+            <input type="text" id="variableSearch" placeholder="Search variables..." style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #ddd; border-radius:4px;">
+            <div id="variableList" style="max-height:300px; overflow-y:auto; border:1px solid #eee; padding:5px; border-radius:4px;">
+                </div>
+            <button type="button" onclick="document.getElementById('variableModal').style.display='none'" style="margin-top:15px; padding:8px 15px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+        </div>
+    </div>
     <script>
     function handleTypeChange() {
         const type = document.getElementById('type').value;
@@ -266,6 +276,154 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
             isDefaultField.style.display = 'block';
         }
     }
+
+    // --- NEW JAVASCRIPT FOR VARIABLE MODAL ---
+    document.addEventListener('DOMContentLoaded', () => {
+        handleTypeChange(); // Call this to set initial field visibility
+
+        const insertVariableBtn = document.getElementById('insertVariableBtn');
+        const variableModal = document.getElementById('variableModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const variableList = document.getElementById('variableList');
+        const variableSearch = document.getElementById('variableSearch');
+        const repliesTextarea = document.getElementById('replies');
+
+        let allVariables = []; // To store all variables including custom ones
+
+        const defaultVariables = [
+            // Date/Time
+            { name: '%DAYOFMONTH%', type: 'Date/Time' },
+            { name: '%DAYOFMONTH_SHORT%', type: 'Date/Time' },
+            { name: '%MONTH%', type: 'Date/Time' },
+            { name: '%MONTH_SHORT%', type: 'Date/Time' },
+            { name: '%YEAR%', type: 'Date/Time' },
+            { name: '%YEAR_SHORT%', type: 'Date/Time' },
+            { name: '%DAYNAME%', type: 'Date/Time' },
+            { name: '%DAYNAME_SHORT%', type: 'Date/Time' },
+            { name: '%HOUR%', type: 'Date/Time' }, // 24-hour format
+            { name: '%MINUTE%', type: 'Date/Time' },
+            { name: '%SECOND%', type: 'Date/Time' },
+            { name: '%TIMESTAMP%', type: 'Date/Time' },
+            { name: '%HOUR12%', type: 'Date/Time' },
+            { name: '%HOUR12_WITH_AMPM%', type: 'Date/Time' },
+            { name: '%HOUR24%', type: 'Date/Time' }, // Same as %HOUR%
+            { name: '%AMPM%', type: 'Date/Time' }, // AM or PM
+            { name: '%DAYOFYEAR%', type: 'Date/Time' },
+            { name: '%WEEKOFYEAR%', type: 'Date/Time' },
+            // Random Generators
+            { name: '%RANDOM_ASCII_SYMBOL_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_A-Z_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_A-Z_0-9_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_a-z_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_a-z_0-9_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_a-z_A-Z_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_a-z_A-Z_0-9_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_CUSTOM_<LENGTH>_<OPT1,OPT2,...>%', type: 'Random' },
+            { name: '%RANDOM_NUMBER_<MIN>-<MAX>%', type: 'Random' },
+            // Placeholder for advanced variables (will need backend integration later)
+            { name: '%RECEIVED_MESSAGE_<MAXLENGTH>%', type: 'Advanced (Placeholder)' },
+            { name: '%PREVIOUS_MESSAGE_<RULEID1,RULEID2,...>_<OFFSET>%', type: 'Advanced (Placeholder)' },
+            { name: '%REPLY_COUNT_OVERALL%', type: 'Advanced (Placeholder)' },
+            { name: '%RULE_ID%', type: 'Advanced (Placeholder)' },
+            { name: '%NAME%', type: 'Advanced (Placeholder)' }, // User's name
+            { name: '%CAPTURING_GROUP_<ID>%', type: 'Advanced (Placeholder)' }, // For Regex captures
+        ];
+
+        async function loadVariables() {
+            try {
+                const response = await fetch('/api/custom-variables'); // New API endpoint to fetch custom variables
+                const customVars = await response.json();
+                allVariables = [
+                    ...defaultVariables,
+                    ...customVars.map(v => ({ name: `%${v.name}%`, type: 'Custom', value: v.value }))
+                ];
+                displayVariables(allVariables);
+            } catch (error) {
+                console.error('Error loading variables:', error);
+                variableList.innerHTML = '<p>Error loading variables. Please try again.</p>';
+            }
+        }
+
+        function displayVariables(variablesToDisplay) {
+            variableList.innerHTML = '';
+            if (variablesToDisplay.length === 0) {
+                variableList.innerHTML = '<p>No variables found.</p>';
+                return;
+            }
+
+            const groupedVariables = variablesToDisplay.reduce((acc, varObj) => {
+                (acc[varObj.type] = acc[varObj.type] || []).push(varObj);
+                return acc;
+            }, {});
+
+            // Sort types for consistent display order
+            const sortedTypes = ['Date/Time', 'Random', 'Custom', 'Advanced (Placeholder)'].filter(type => groupedVariables[type]);
+
+            sortedTypes.forEach(type => {
+                const typeHeader = document.createElement('h4');
+                typeHeader.textContent = type;
+                typeHeader.style.marginTop = '10px';
+                typeHeader.style.marginBottom = '5px';
+                typeHeader.style.color = '#333';
+                variableList.appendChild(typeHeader);
+
+                groupedVariables[type].forEach(varObj => {
+                    const varItem = document.createElement('div');
+                    varItem.className = 'variable-item';
+                    varItem.style.padding = '8px';
+                    varItem.style.borderBottom = '1px solid #eee';
+                    varItem.style.cursor = 'pointer';
+                    varItem.style.backgroundColor = '#f9f9f9';
+                    varItem.style.marginBottom = '2px';
+                    varItem.style.borderRadius = '3px';
+                    varItem.style.transition = 'background-color 0.2s';
+                    varItem.onmouseover = () => varItem.style.backgroundColor = '#e6e6e6';
+                    varItem.onmouseout = () => varItem.style.backgroundColor = '#f9f9f9';
+
+
+                    varItem.innerHTML = `<strong>${varObj.name}</strong> ${varObj.type === 'Custom' ? `<small>(Value: ${varObj.value.slice(0, 50)}${varObj.value.length > 50 ? '...' : ''})</small>` : ''}`;
+
+                    varItem.onclick = () => {
+                        const cursorPos = repliesTextarea.selectionStart;
+                        const textBefore = repliesTextarea.value.substring(0, cursorPos);
+                        const textAfter = repliesTextarea.value.substring(cursorPos, repliesTextarea.value.length);
+                        repliesTextarea.value = textBefore + varObj.name + textAfter;
+                        repliesTextarea.selectionStart = repliesTextarea.selectionEnd = cursorPos + varObj.name.length;
+                        variableModal.style.display = 'none';
+                        repliesTextarea.focus(); // Focus back on textarea
+                    };
+                    variableList.appendChild(varItem);
+                });
+            });
+        }
+    }
+
+    insertVariableBtn.addEventListener('click', () => {
+        loadVariables(); // Load and display variables every time button is clicked
+        variableModal.style.display = 'block';
+        variableSearch.value = ''; // Clear search on open
+        variableSearch.focus(); // Focus search input
+    });
+
+    closeModalBtn.addEventListener('click', () => {
+        variableModal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (event) => {
+        if (event.target == variableModal) {
+            variableModal.style.display = 'none';
+        }
+    });
+
+    variableSearch.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const filteredVariables = allVariables.filter(varObj =>
+            varObj.name.toLowerCase().includes(searchTerm) ||
+            (varObj.type === 'Custom' && varObj.value.toLowerCase().includes(searchTerm))
+        );
+        displayVariables(filteredVariables);
+    });
+    });
     </script>
     `;
     res.send(getHtmlTemplate('Add Chat Reply', addReplyForm));
@@ -394,13 +552,13 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
 
         // Drag start
         list.addEventListener('dragstart', (e) => {
-    if (!e.target.classList.contains('drag-handle')) {
-        e.preventDefault(); // prevent drag unless it's on icon
-        return;
-    }
-    dragged = e.target.closest('li.reply-item');
-    dragged.style.opacity = 0.5;
-});
+            if (!e.target.classList.contains('drag-handle')) {
+                e.preventDefault(); // prevent drag unless it's on icon
+                return;
+            }
+            dragged = e.target.closest('li.reply-item');
+            dragged.style.opacity = 0.5;
+        });
         // Drag over
         list.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -447,7 +605,7 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     res.send(getHtmlTemplate('Chat Reply List', content));
 });
 
-// EDIT REPLY
+// EDIT REPLY (modified for variable insertion UI)
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     const r = await ChatReply.findById(req.params.id);
     if (!r) {
@@ -479,7 +637,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
 
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>
-
+        <button type="button" id="insertVariableBtn" style="margin-top: 5px; padding: 8px 12px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Insert Variable</button>
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="${r.priority}" />
 
@@ -494,6 +652,16 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         <button type="submit">Update Reply</button>
     </form>
 
+    <div id="variableModal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color: rgba(0,0,0,0.4);">
+        <div style="background-color:#fefefe; margin: 10% auto; padding:20px; border:1px solid #888; width:80%; max-width:600px; border-radius: 8px; position: relative;">
+            <span id="closeModalBtn" style="color:#aaa; float:right; font-size:28px; font-weight:bold; cursor:pointer;">&times;</span>
+            <h3>Select Variable to Insert</h3>
+            <input type="text" id="variableSearch" placeholder="Search variables..." style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #ddd; border-radius:4px;">
+            <div id="variableList" style="max-height:300px; overflow-y:auto; border:1px solid #eee; padding:5px; border-radius:4px;">
+                </div>
+            <button type="button" onclick="document.getElementById('variableModal').style.display='none'" style="margin-top:15px; padding:8px 15px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+        </div>
+    </div>
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const type = "${r.type}";
@@ -510,6 +678,147 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         if (type === 'default_message') {
             isDefaultField.style.display = 'block';
         }
+
+        // --- NEW JAVASCRIPT FOR VARIABLE MODAL (Copied from Add Reply Form) ---
+        const insertVariableBtn = document.getElementById('insertVariableBtn');
+        const variableModal = document.getElementById('variableModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const variableList = document.getElementById('variableList');
+        const variableSearch = document.getElementById('variableSearch');
+        const repliesTextarea = document.getElementById('replies');
+
+        let allVariables = [];
+
+        const defaultVariables = [
+            // Date/Time
+            { name: '%DAYOFMONTH%', type: 'Date/Time' },
+            { name: '%DAYOFMONTH_SHORT%', type: 'Date/Time' },
+            { name: '%MONTH%', type: 'Date/Time' },
+            { name: '%MONTH_SHORT%', type: 'Date/Time' },
+            { name: '%YEAR%', type: 'Date/Time' },
+            { name: '%YEAR_SHORT%', type: 'Date/Time' },
+            { name: '%DAYNAME%', type: 'Date/Time' },
+            { name: '%DAYNAME_SHORT%', type: 'Date/Time' },
+            { name: '%HOUR%', type: 'Date/Time' }, // 24-hour format
+            { name: '%MINUTE%', type: 'Date/Time' },
+            { name: '%SECOND%', type: 'Date/Time' },
+            { name: '%TIMESTAMP%', type: 'Date/Time' },
+            { name: '%HOUR12%', type: 'Date/Time' },
+            { name: '%HOUR12_WITH_AMPM%', type: 'Date/Time' },
+            { name: '%HOUR24%', type: 'Date/Time' },
+            { name: '%AMPM%', type: 'Date/Time' },
+            { name: '%DAYOFYEAR%', type: 'Date/Time' },
+            { name: '%WEEKOFYEAR%', type: 'Date/Time' },
+            // Random Generators
+            { name: '%RANDOM_ASCII_SYMBOL_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_A-Z_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_A-Z_0-9_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_a-z_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_a-z_0-9_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_a-z_A-Z_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_a-z_A-Z_0-9_<LENGTH>%', type: 'Random' },
+            { name: '%RANDOM_CUSTOM_<LENGTH>_<OPT1,OPT2,...>%', type: 'Random' },
+            { name: '%RANDOM_NUMBER_<MIN>-<MAX>%', type: 'Random' },
+            // Placeholder for advanced variables (will need backend integration later)
+            { name: '%RECEIVED_MESSAGE_<MAXLENGTH>%', type: 'Advanced (Placeholder)' },
+            { name: '%PREVIOUS_MESSAGE_<RULEID1,RULEID2,...>_<OFFSET>%', type: 'Advanced (Placeholder)' },
+            { name: '%REPLY_COUNT_OVERALL%', type: 'Advanced (Placeholder)' },
+            { name: '%RULE_ID%', type: 'Advanced (Placeholder)' },
+            { name: '%NAME%', type: 'Advanced (Placeholder)' }, // User's name
+            { name: '%CAPTURING_GROUP_<ID>%', type: 'Advanced (Placeholder)' }, // For Regex captures
+        ];
+
+        async function loadVariables() {
+            try {
+                const response = await fetch('/api/custom-variables');
+                const customVars = await response.json();
+                allVariables = [
+                    ...defaultVariables,
+                    ...customVars.map(v => ({ name: `%${v.name}%`, type: 'Custom', value: v.value }))
+                ];
+                displayVariables(allVariables);
+            } catch (error) {
+                console.error('Error loading variables:', error);
+                variableList.innerHTML = '<p>Error loading variables. Please try again.</p>';
+            }
+        }
+
+        function displayVariables(variablesToDisplay) {
+            variableList.innerHTML = '';
+            if (variablesToDisplay.length === 0) {
+                variableList.innerHTML = '<p>No variables found.</p>';
+                return;
+            }
+
+            const groupedVariables = variablesToDisplay.reduce((acc, varObj) => {
+                (acc[varObj.type] = acc[varObj.type] || []).push(varObj);
+                return acc;
+            }, {});
+
+            const sortedTypes = ['Date/Time', 'Random', 'Custom', 'Advanced (Placeholder)'].filter(type => groupedVariables[type]);
+
+            sortedTypes.forEach(type => {
+                const typeHeader = document.createElement('h4');
+                typeHeader.textContent = type;
+                typeHeader.style.marginTop = '10px';
+                typeHeader.style.marginBottom = '5px';
+                typeHeader.style.color = '#333';
+                variableList.appendChild(typeHeader);
+
+                groupedVariables[type].forEach(varObj => {
+                    const varItem = document.createElement('div');
+                    varItem.className = 'variable-item';
+                    varItem.style.padding = '8px';
+                    varItem.style.borderBottom = '1px solid #eee';
+                    varItem.style.cursor = 'pointer';
+                    varItem.style.backgroundColor = '#f9f9f9';
+                    varItem.style.marginBottom = '2px';
+                    varItem.style.borderRadius = '3px';
+                    varItem.style.transition = 'background-color 0.2s';
+                    varItem.onmouseover = () => varItem.style.backgroundColor = '#e6e6e6';
+                    varItem.onmouseout = () => varItem.style.backgroundColor = '#f9f9f9';
+
+                    varItem.innerHTML = `<strong>${varObj.name}</strong> ${varObj.type === 'Custom' ? `<small>(Value: ${varObj.value.slice(0, 50)}${varObj.value.length > 50 ? '...' : ''})</small>` : ''}`;
+
+                    varItem.onclick = () => {
+                        const cursorPos = repliesTextarea.selectionStart;
+                        const textBefore = repliesTextarea.value.substring(0, cursorPos);
+                        const textAfter = repliesTextarea.value.substring(cursorPos, repliesTextarea.value.length);
+                        repliesTextarea.value = textBefore + varObj.name + textAfter;
+                        repliesTextarea.selectionStart = repliesTextarea.selectionEnd = cursorPos + varObj.name.length;
+                        variableModal.style.display = 'none';
+                        repliesTextarea.focus();
+                    };
+                    variableList.appendChild(varItem);
+                });
+            });
+        }
+
+        insertVariableBtn.addEventListener('click', () => {
+            loadVariables();
+            variableModal.style.display = 'block';
+            variableSearch.value = '';
+            variableSearch.focus();
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            variableModal.style.display = 'none';
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target == variableModal) {
+                variableModal.style.display = 'none';
+            }
+        });
+
+        variableSearch.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredVariables = allVariables.filter(varObj =>
+                varObj.name.toLowerCase().includes(searchTerm) ||
+                (varObj.type === 'Custom' && varObj.value.toLowerCase().includes(searchTerm))
+            );
+            displayVariables(filteredVariables);
+        });
     });
     </script>
 
@@ -664,10 +973,21 @@ app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) =
 });
 // --- END NEW CODE: Custom Variable Management Routes ---
 
+// --- NEW API ENDPOINT TO FETCH CUSTOM VARIABLES FOR JS MODAL ---
+app.get('/api/custom-variables', isAuthenticated, async (req, res) => {
+    try {
+        const customVariables = await CustomVariable.find({}, 'name value'); // Only fetch name and value
+        res.json(customVariables);
+    } catch (error) {
+        console.error('Error fetching custom variables:', error);
+        res.status(500).json({ message: 'Error fetching custom variables' });
+    }
+});
+// --- END NEW API ENDPOINT ---
+
 
 // --- NEW CODE: Variable Replacement Function ---
 async function applyVariableReplacements(text) {
-    // 1. Fetch all custom variables (cache this if performance is critical)
     const customVars = await CustomVariable.find({});
     const customVarMap = new Map();
     customVars.forEach(v => customVarMap.set(v.name.toUpperCase(), v.value));
@@ -679,13 +999,12 @@ async function applyVariableReplacements(text) {
     while (iterationCount < maxIterations) {
         let changesMade = false;
 
-        // 2. Default Variable Replacements (First pass for current date/time)
         const now = new Date();
         const defaultReplacements = {
             '%DAYOFMONTH%': now.getDate().toString().padStart(2, '0'),
             '%MONTH%': now.toLocaleString('en-US', { month: 'long' }),
             '%YEAR%': now.getFullYear().toString(),
-            '%HOUR%': now.getHours().toString().padStart(2, '0'),
+            '%HOUR%': now.getHours().toString().padStart(2, '0'), // 24-hour format
             '%MINUTE%': now.getMinutes().toString().padStart(2, '0'),
             '%SECOND%': now.getSeconds().toString().padStart(2, '0'),
             '%DAYNAME%': now.toLocaleString('en-US', { weekday: 'long' }),
@@ -696,18 +1015,150 @@ async function applyVariableReplacements(text) {
                 hour: 'numeric',
                 minute: 'numeric',
                 hour12: true
-            })
+            }),
+            // --- NEW DATE/TIME VARS ---
+            '%DAYOFMONTH_SHORT%': now.getDate().toString(), // No leading zero
+            '%MONTH_SHORT%': now.toLocaleString('en-US', { month: 'short' }),
+            '%DAYNAME_SHORT%': now.toLocaleString('en-US', { weekday: 'short' }),
+            '%YEAR_SHORT%': now.getFullYear().toString().slice(-2), // Last two digits of year
+            '%HOUR12%': now.toLocaleString('en-US', { hour: 'numeric', hour12: true }).replace(/ AM| PM/, ''), // 12-hour without AM/PM
+            '%HOUR12_WITH_AMPM%': now.toLocaleString('en-US', { hour: 'numeric', hour12: true }), // 12-hour with AM/PM
+            '%HOUR24%': now.getHours().toString().padStart(2, '0'), // Same as %HOUR%
+            '%AMPM%': now.toLocaleString('en-US', { hour: 'numeric', hour12: true }).slice(-2).trim(), // AM or PM
+            '%DAYOFYEAR%': Math.ceil((now - new Date(now.getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24)).toString(),
+            '%WEEKOFYEAR%': Math.ceil((now - new Date(now.getFullYear(), 0, 1) + new Date(now.getFullYear(), 0, 1).getDay() * 86400000) / (7 * 86400000)).toString(),
+            // --- END NEW DATE/TIME VARS ---
         };
 
         for (const [key, value] of Object.entries(defaultReplacements)) {
-            const regex = new RegExp(key.replace(/%/g, '\\%'), 'gi'); // 'gi' for global and case-insensitive
+            const regex = new RegExp(key.replace(/%/g, '\\%'), 'gi');
             if (replacedText.match(regex)) {
                 replacedText = replacedText.replace(regex, value);
                 changesMade = true;
             }
         }
 
-        // 3. Custom Variable Replacements
+        // --- NEW RANDOM VARS ---
+        // %RANDOM_ASCII_SYMBOL_<LENGTH>%
+        replacedText = replacedText.replace(/%RANDOM_ASCII_SYMBOL_(\d+)%/gi, (match, lengthStr) => {
+            const length = parseInt(lengthStr);
+            if (isNaN(length) || length <= 0) return match;
+            let result = '';
+            const characters = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            changesMade = true;
+            return result;
+        });
+
+        // %RANDOM_A-Z_<LENGTH>%
+        replacedText = replacedText.replace(/%RANDOM_A-Z_(\d+)%/gi, (match, lengthStr) => {
+            const length = parseInt(lengthStr);
+            if (isNaN(length) || length <= 0) return match;
+            let result = '';
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            changesMade = true;
+            return result;
+        });
+
+        // %RANDOM_A-Z_0-9_<LENGTH>%
+        replacedText = replacedText.replace(/%RANDOM_A-Z_0-9_(\d+)%/gi, (match, lengthStr) => {
+            const length = parseInt(lengthStr);
+            if (isNaN(length) || length <= 0) return match;
+            let result = '';
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            changesMade = true;
+            return result;
+        });
+
+        // %RANDOM_a-z_<LENGTH>%
+        replacedText = replacedText.replace(/%RANDOM_a-z_(\d+)%/gi, (match, lengthStr) => {
+            const length = parseInt(lengthStr);
+            if (isNaN(length) || length <= 0) return match;
+            let result = '';
+            const characters = 'abcdefghijklmnopqrstuvwxyz';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            changesMade = true;
+            return result;
+        });
+
+        // %RANDOM_a-z_0-9_<LENGTH>%
+        replacedText = replacedText.replace(/%RANDOM_a-z_0-9_(\d+)%/gi, (match, lengthStr) => {
+            const length = parseInt(lengthStr);
+            if (isNaN(length) || length <= 0) return match;
+            let result = '';
+            const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            changesMade = true;
+            return result;
+        });
+
+        // %RANDOM_a-z_A-Z_<LENGTH>%
+        replacedText = replacedText.replace(/%RANDOM_a-z_A-Z_(\d+)%/gi, (match, lengthStr) => {
+            const length = parseInt(lengthStr);
+            if (isNaN(length) || length <= 0) return match;
+            let result = '';
+            const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            changesMade = true;
+            return result;
+        });
+
+        // %RANDOM_a-z_A-Z_0-9_<LENGTH>%
+        replacedText = replacedText.replace(/%RANDOM_a-z_A-Z_0-9_(\d+)%/gi, (match, lengthStr) => {
+            const length = parseInt(lengthStr);
+            if (isNaN(length) || length <= 0) return match;
+            let result = '';
+            const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            changesMade = true;
+            return result;
+        });
+
+
+        // %RANDOM_CUSTOM_<LENGTH>_<OPT1,OPT2,OPT3>% (e.g., %RANDOM_CUSTOM_3_APPLE,BANANA,CHERRY%)
+        replacedText = replacedText.replace(/%RANDOM_CUSTOM_(\d+)_([^%]+)%/gi, (match, lengthStr, optionsStr) => {
+            const length = parseInt(lengthStr);
+            if (isNaN(length) || length <= 0) return match;
+
+            const options = optionsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            if (options.length === 0) return match;
+
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += options[Math.floor(Math.random() * options.length)];
+            }
+            changesMade = true;
+            return result;
+        });
+
+        // %RANDOM_NUMBER_<A>-<B>% (e.g., %RANDOM_NUMBER_1-100%)
+        replacedText = replacedText.replace(/%RANDOM_NUMBER_(\d+)-(\d+)%/gi, (match, minStr, maxStr) => {
+            const min = parseInt(minStr);
+            const max = parseInt(maxStr);
+            if (isNaN(min) || isNaN(max) || min > max) return match;
+            changesMade = true;
+            return (Math.floor(Math.random() * (max - min + 1)) + min).toString();
+        });
+        // --- END NEW RANDOM VARS ---
+
+
+        // Custom Variable Replacements
         for (const [name, value] of customVarMap.entries()) {
             const varPlaceholder = `%${name}%`;
             if (replacedText.includes(varPlaceholder)) {
