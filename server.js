@@ -1,4 +1,4 @@
-Const express = require('express');
+const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
