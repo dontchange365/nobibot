@@ -291,18 +291,19 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const replies = await ChatReply.find().sort({ priority: -1 });
 
     const listItems = replies.map((r, index) => `
-        <li class="reply-item" data-id="${r._id}" draggable="true">
-            <div class="title">
-                <strong>${r.ruleName}</strong>
-                <span class="type">(${r.type})</span>
-            </div>
-            ${r.keyword ? `<div class="keywords">${r.keyword.slice(0, 60)}${r.keyword.length > 60 ? '...' : ''}</div>` : ''}
-            <div class="actions">
-                <a href="/admin/edit-reply/${r._id}" class="edit-btn">✏️</a>
-                <a href="/admin/delete-reply/${r._id}" class="delete-btn" onclick="return confirm('Delete this rule?')">🗑️</a>
-            </div>
-        </li>
-    `).join('');
+    <li class="reply-item" data-id="${r._id}" draggable="true">
+        <div class="drag-handle" title="Drag to reorder">⠿</div>
+        <div class="title">
+            <strong>${r.ruleName}</strong>
+            <span class="type">(${r.type})</span>
+        </div>
+        ${r.keyword ? `<div class="keywords">${r.keyword.slice(0, 60)}${r.keyword.length > 60 ? '...' : ''}</div>` : ''}
+        <div class="actions">
+            <a href="/admin/edit-reply/${r._id}" class="edit-btn">✏️</a>
+            <a href="/admin/delete-reply/${r._id}" class="delete-btn" onclick="return confirm('Delete this rule?')">🗑️</a>
+        </div>
+    </li>
+`).join('');
 
     const content = `
     <h2>🧠 Chat Rules (Drag to Reorder, Tap to Set Priority)</h2>
@@ -321,19 +322,33 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
             gap: 10px;
         }
         .reply-item {
-            background: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            cursor: grab;
-            transition: transform 0.2s;
-            user-select: none;
-            cursor: grab;
-        }
-        .reply-item:active {
-            transform: scale(1.02);
-            cursor: grabbing;
-        }
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    user-select: none;
+    cursor: grab;
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+.reply-item:active {
+    cursor: grabbing;
+    transform: scale(1.02);
+}
+
+.drag-handle {
+    font-size: 20px;
+    color: #999;
+    cursor: grab;
+    user-select: none;
+}
+.drag-handle:active {
+    cursor: grabbing;
+}
+
         .title {
             font-size: 16px;
             margin-bottom: 5px;
@@ -371,21 +386,23 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
 
         // Drag start
         list.addEventListener('dragstart', (e) => {
-        dragged = e.target.closest('li.reply-item');
-        if (!dragged) return;
-        dragged.style.opacity = 0.5;
+    if (!e.target.classList.contains('drag-handle')) {
+        e.preventDefault(); // prevent drag unless it's on icon
+        return;
+    }
+    dragged = e.target.closest('li.reply-item');
+    dragged.style.opacity = 0.5;
 });
-
-         // Drag over
-    list.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        const after = [...list.children].find(el => e.clientY < el.getBoundingClientRect().top + el.offsetHeight / 2);
-        if (after == null) {
-            list.appendChild(dragged);
-        } else {
-            list.insertBefore(dragged, after);
-        }
-    });
+        // Drag over
+        list.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const after = [...list.children].find(el => e.clientY < el.getBoundingClientRect().top + el.offsetHeight / 2);
+            if (after == null) {
+                list.appendChild(dragged);
+            } else {
+                list.insertBefore(dragged, after);
+            }
+        });
 
         list.addEventListener('dragend', () => {
             dragged.style.opacity = 1;
