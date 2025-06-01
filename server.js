@@ -1,100 +1,89 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Chatbot</title>
-    <style>
-        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f4f4f4; }
-        .chat-container { background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 400px; display: flex; flex-direction: column; height: 500px; overflow: hidden; }
-        .chat-messages { flex-grow: 1; padding: 20px; overflow-y: auto; border-bottom: 1px solid #eee; }
-        .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 5px; max-width: 80%; }
-        .message.user { background-color: #007bff; color: white; align-self: flex-end; margin-left: auto; }
-        .message.bot { background-color: #e2e6ea; color: #333; align-self: flex-start; margin-right: auto; }
-        .chat-input { display: flex; padding: 15px; border-top: 1px solid #eee; }
-        .chat-input input { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-right: 10px; }
-        .chat-input button { padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        .chat-input button:hover { background-color: #218838; }
-    </style>
-</head>
-<body>
-    <div class="chat-container">
-        <div class="chat-messages" id="chat-messages">
-            </div>
-        <div class="chat-input">
-            <input type="text" id="message-input" placeholder="Type your message...">
-            <button id="send-button">Send</button>
-        </div>
-    </div>
+// server.js
+require('dotenv').config(); // Load environment variables from .env file
+const express = require('express');
+const mongoose = require('mongoose');
+const path = require('path'); // For serving static files
 
-    <script>
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const chatMessages = document.getElementById('chat-messages');
+const app = express();
+const port = process.env.PORT || 3000; // Use port from environment or default to 3000
 
-        // Function to display a message in the chat
-        function displayMessage(text, sender) {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message', sender);
-            messageDiv.textContent = text;
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+// Middleware to parse JSON request bodies
+app.use(express.json());
+
+// Serve static files (your index.html, CSS, client-side JS)
+app.use(express.static(path.join(__dirname, 'public'))); // Assuming index.html is in a 'public' folder
+
+// MongoDB Connection
+// It's best practice to store your MONGODB_URI in a .env file
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+    console.error("Error: MONGODB_URI is not defined in environment variables.");
+    process.exit(1); // Exit the process if URI is missing
+}
+
+mongoose.connect(MONGODB_URI)
+    .then(() => console.log('MongoDB connected successfully!'))
+    .catch(err => {
+        console.error('MongoDB connection error:', err);
+        process.exit(1); // Exit if connection fails
+    });
+
+// Define a simple Mongoose Schema and Model for chat messages
+const messageSchema = new mongoose.Schema({
+    text: { type: String, required: true },
+    sender: { type: String, required: true }, // 'user' or 'bot'
+    timestamp: { type: Date, default: Date.now }
+});
+
+const Message = mongoose.model('Message', messageSchema);
+
+// API endpoint for sending messages
+app.post('/api/message', async (req, res) => {
+    const { text } = req.body;
+
+    if (!text) {
+        return res.status(400).json({ error: 'Message text is required.' });
+    }
+
+    try {
+        // Save user message to DB
+        const userMessage = new Message({ text, sender: 'user' });
+        await userMessage.save();
+
+        // Simulate a bot reply (you'll replace this with actual bot logic)
+        let botReplyText = "Hello! How can I help you today?";
+        if (text.toLowerCase().includes('hi') || text.toLowerCase().includes('hello')) {
+            botReplyText = "Hi there! What's on your mind?";
+        } else if (text.toLowerCase().includes('weather')) {
+            botReplyText = "I don't have real-time weather information, but it's always sunny in the world of code!";
+        } else {
+            botReplyText = "I received your message: '" + text + "'. I'm a simple bot right now.";
         }
 
-        // Function to send a message to the server
-        async function sendMessage() {
-            const text = messageInput.value.trim();
-            if (text === '') return;
+        // Save bot reply to DB
+        const botMessage = new Message({ text: botReplyText, sender: 'bot' });
+        await botMessage.save();
 
-            displayMessage(text, 'user'); // Display user's message immediately
-            messageInput.value = ''; // Clear input
+        res.status(200).json({ userMessage, botMessage }); // Send back both messages
+    } catch (error) {
+        console.error('Error processing message:', error);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+});
 
-            try {
-                const response = await fetch('/api/message', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ text })
-                });
+// Optional: API endpoint to get all messages (for chat history)
+app.get('/api/messages', async (req, res) => {
+    try {
+        const messages = await Message.find().sort({ timestamp: 1 });
+        res.status(200).json(messages);
+    } catch (error) {
+        console.error('Error fetching messages:', error);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+});
 
-                const data = await response.json();
-                if (response.ok) {
-                    displayMessage(data.botMessage.text, 'bot'); // Display bot's reply
-                } else {
-                    console.error('Error from server:', data.error);
-                    displayMessage('Error: Could not get a reply from the bot.', 'bot');
-                }
-            } catch (error) {
-                console.error('Network error:', error);
-                displayMessage('Error: Could not connect to the server.', 'bot');
-            }
-        }
-
-        // Event listeners
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
-
-        // Optional: Load chat history when the page loads
-        async function loadChatHistory() {
-            try {
-                const response = await fetch('/api/messages');
-                const messages = await response.json();
-                if (response.ok) {
-                    messages.forEach(msg => displayMessage(msg.text, msg.sender));
-                } else {
-                    console.error('Error loading history:', messages.error);
-                }
-            } catch (error) {
-                console.error('Network error loading history:', error);
-            }
-        }
-
-        loadChatHistory(); // Call this on page load
-    </script>
-</body>
-</html>
+// Start the server
+app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
+});
