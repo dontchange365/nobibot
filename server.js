@@ -327,9 +327,12 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             cursor: grab;
             transition: transform 0.2s;
+            user-select: none;
+            cursor: grab;
         }
         .reply-item:active {
             transform: scale(1.02);
+            cursor: grabbing;
         }
         .title {
             font-size: 16px;
