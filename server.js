@@ -1,25 +1,19 @@
-// server.js
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const path = require('path');
 const bcrypt = require('bcryptjs');
-const mongoose = require('mongoose'); // Make sure mongoose is installed and connected
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- Mongoose Connection (Add your actual MongoDB URI here if not already connected) ---
-// If your Mongoose connection is handled in another file, you can remove this block
-// but ensure it's established before routes that use Mongoose models.
-const MONGO_URI = process.env.MONGODB_URI || 'YOUR_MONGODB_CONNECTION_STRING'; // REPLACE THIS
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://dontchange365:DtUiOMFzQVM0tG9l@nobifeedback.9ntuipc.mongodb.net/?retryWrites=true&w=majority&appName=nobifeedback';
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log('MongoDB Connected!'))
     .catch(err => console.error('MongoDB connection error:', err));
 
-// --- Admin Mongoose Schema and Model (Defined Directly in server.js) ---
 const AdminSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true }
@@ -39,12 +33,11 @@ AdminSchema.methods.comparePassword = function(candidatePassword) {
 
 const Admin = mongoose.model('Admin', AdminSchema);
 
-// --- Middleware Setup ---
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'a_very_secret_key_that_you_should_change_and_make_long_and_random',
+    secret: process.env.SESSION_SECRET || 'MySuperStrongAndVeryRandomSessionSecretKey123!@#ABCxyz',
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 1000 * 60 * 60 * 24, secure: process.env.NODE_ENV === 'production' }
@@ -52,7 +45,6 @@ app.use(session({
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Authentication Middleware ---
 function isAuthenticated(req, res, next) {
     if (req.session.loggedIn) {
         next();
@@ -61,13 +53,10 @@ function isAuthenticated(req, res, next) {
     }
 }
 
-// --- Routes ---
-
 app.get('/', (req, res) => {
     res.redirect('/admin/login');
 });
 
-// Login Page Route (GET)
 app.get('/admin/login', (req, res) => {
     if (req.session.loggedIn) {
         return res.redirect('/admin/dashboard');
@@ -107,7 +96,6 @@ app.get('/admin/login', (req, res) => {
     `);
 });
 
-// Login POST Route
 app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
 
@@ -132,7 +120,6 @@ app.post('/admin/login', async (req, res) => {
     }
 });
 
-// Admin Dashboard Route (Protected)
 app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -161,7 +148,6 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     `);
 });
 
-// Logout Route
 app.get('/admin/logout', (req, res) => {
     req.session.destroy(err => {
         if (err) {
@@ -172,7 +158,26 @@ app.get('/admin/logout', (req, res) => {
     });
 });
 
-// --- Start the Server ---
+// TEMPORARY ROUTE - ISKO ADMIN BANANE KE BAAD TURANT HATA DENA!
+app.get('/create-first-admin-secret-route', async (req, res) => {
+    const username = process.env.ADMIN_USERNAME;
+    const password = process.env.ADMIN_PASSWORD;
+    try {
+        const existingAdmin = await Admin.findOne({ username });
+        if (existingAdmin) {
+            return res.send(`Admin user '${username}' already exists. REMOVE THIS ROUTE NOW!`);
+        }
+        const newAdmin = new Admin({ username, password });
+        await newAdmin.save();
+        res.send(`Admin user '${username}' created successfully! REMOVE THIS ROUTE NOW!`);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error creating admin user.');
+    }
+});
+// TEMPORARY ROUTE END - ISKO HAMESHA DELETE KARNA HAI!
+
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log('Open your browser and go to http://localhost:3000/admin/login to access the login page.');
