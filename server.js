@@ -34,13 +34,14 @@ const Admin = mongoose.model('Admin', AdminSchema);
 
 // Chat Reply Schema
 const ChatReplySchema = new mongoose.Schema({
-    ruleName: { type: String, required: true }, // ✅ ADD THIS
+    ruleName: { type: String, required: true },
     type: { type: String, required: true },
     keyword: String,
     pattern: String,
     replies: [String],
     priority: { type: Number, default: 0 },
-    isDefault: { type: Boolean, default: false }
+    isDefault: { type: Boolean, default: false },
+    sendMethod: { type: String, enum: ['random', 'all', 'once'], default: 'random' } // ✅ new field
 });
 const ChatReply = mongoose.model('ChatReply', ChatReplySchema);
 
@@ -104,7 +105,7 @@ app.post('/api/chatbot/message', async (req, res) => {
     try {
         // 1. Exact Match
         const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
-        if (exact) return res.json({ reply: randomReply(exact.replies) });
+        return res.json({ reply: handleReplySend(exact) });
 
         // 2. Pattern Matching
         const patterns = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 });
@@ -188,6 +189,12 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
     <form method="POST" action="/admin/add-chat-replies" id="replyForm">
         <label for="ruleName">Rule Name:</label>
         <input name="ruleName" id="ruleName" placeholder="e.g. Greet User" required />
+        <label for="sendMethod">Send Method:</label>
+<select name="sendMethod" id="sendMethod">
+    <option value="random">Random</option>
+    <option value="all">All</option>
+    <option value="once">Once (first one)</option>
+</select>
         <h2>Add Chat Reply</h2>
         <label for="type">Type:</label>
         <select name="type" id="type" required onchange="handleTypeChange()">
@@ -255,7 +262,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
 });
 
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
-    const { ruleName, type, keyword, pattern, replies, priority, isDefault } = req.body;
+    const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     if (!replies) return res.send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>'));
 
     if (type === 'default_message' && isDefault === 'true') {
@@ -269,7 +276,8 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     pattern: pattern || '',
     replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
     priority: parseInt(priority),
-    isDefault: isDefault === 'true'
+    isDefault: isDefault === 'true',
+    sendMethod: sendMethod || 'random'
 });
 
     await newReply.save();
@@ -325,6 +333,12 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     <form method="POST" action="/admin/edit-reply/${r._id}">
         <label for="ruleName">Rule Name:</label>
         <input name="ruleName" id="ruleName" value="${r.ruleName}" required />
+        <label for="sendMethod">Send Method:</label>
+<select name="sendMethod" id="sendMethod">
+    <option value="random" ${r.sendMethod === 'random' ? 'selected' : ''}>Random</option>
+    <option value="all" ${r.sendMethod === 'all' ? 'selected' : ''}>All</option>
+    <option value="once" ${r.sendMethod === 'once' ? 'selected' : ''}>Once</option>
+</select>
         <h2>Edit Reply</h2>
         <label for="type">Type:</label>
         <input name="type" id="type" value="${r.type}" readonly />
@@ -382,14 +396,15 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
 });
 
 app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
-    const { ruleName, keyword, pattern, replies, priority, isDefault } = req.body;
+    const { ruleName, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     const update = {
     ruleName,
     keyword: keyword || '',
     pattern: pattern || '',
     replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
     priority: parseInt(priority),
-    isDefault: isDefault === 'true'
+    isDefault: isDefault === 'true',
+    sendMethod: sendMethod || 'random'
 };
     if (update.isDefault) {
         await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
@@ -397,6 +412,20 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     await ChatReply.findByIdAndUpdate(req.params.id, update);
     res.redirect('/admin/reply-list');
 });
+
+function handleReplySend(replyObj) {
+    if (!replyObj || !replyObj.replies || replyObj.replies.length === 0) return "No reply found";
+
+    switch (replyObj.sendMethod) {
+        case 'once':
+            return replyObj.replies[0]; // First one always
+        case 'all':
+            return replyObj.replies.join('\n'); // All line by line
+        case 'random':
+        default:
+            return randomReply(replyObj.replies); // Random default
+    }
+}
 
 // DELETE
 app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
