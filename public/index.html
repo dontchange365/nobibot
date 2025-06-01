@@ -1,0 +1,355 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NOBI BOT - Insta Chat Style</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --vh: 100%;
+    }
+
+    html, body {
+      height: 100%;
+      overscroll-behavior-y: none;
+    }
+
+    body {
+      margin: 0;
+      background: #000;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      height: var(--vh);
+      overflow: hidden;
+    }
+
+    .topbar {
+      background: #111;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #222;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      height: 60px;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .topbar-left img {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+    }
+
+    .topbar-name {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .topbar-name strong {
+      font-size: 15px;
+    }
+
+    .topbar-name span {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .topbar-icons {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 20px;
+      color: #aaa;
+    }
+
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 80px 15px 10px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .msg {
+      max-width: 75%;
+      margin-bottom: 10px;
+      line-height: 1.4;
+      padding: 10px 14px;
+      border-radius: 20px;
+      word-wrap: break-word;
+    }
+
+    .user-msg {
+      align-self: flex-end;
+      background-color: #8b5cf6;
+      color: #fff;
+      border-bottom-right-radius: 2px;
+    }
+
+    .bot-msg-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .bot-msg {
+      align-self: flex-start;
+      background-color: #262626;
+      color: #fff;
+      border-bottom-left-radius: 2px;
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+    }
+
+    #typing {
+      display: none;
+      padding-left: 40px;
+      margin-bottom: 10px;
+    }
+
+    .typing-dots {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #888;
+      border-radius: 50%;
+      animation: blink 1s infinite alternate;
+      margin-right: 4px;
+    }
+
+    .typing-dots:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes blink {
+      0% { opacity: .3; }
+      100% { opacity: 1; }
+    }
+
+    #input-area {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      background: #111;
+      border-top: 1px solid #222;
+    }
+
+    #message-input {
+      flex: 1;
+      padding: 10px;
+      background: #222;
+      border: none;
+      border-radius: 25px;
+      color: #fff;
+      margin-right: 10px;
+      font-size: 16px;
+    }
+
+    #send-btn {
+      background: #8b5cf6;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 50%;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #send-btn:hover {
+      background: #7c3aed;
+    }
+
+    #follow-lock {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    #follow-lock img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      margin: 10px 0;
+    }
+
+    #follow-lock h3 {
+      margin: 10px 0 5px;
+    }
+
+    #follow-lock p {
+      margin: 4px 0;
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    .view-btn, .follow-btn {
+      margin-top: 8px;
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      background: none;
+    }
+
+    .view-btn {
+      border: 1px solid #fff;
+      color: #fff;
+      background: transparent;
+    }
+
+    .follow-btn {
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      margin-top: 10px;
+    }
+  
+/* Follow Button Styling */
+.follow-btn {
+  background-color: #0095f6;
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-top: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.follow-btn:hover {
+  background-color: #007acc;
+}
+.follow-btn:active {
+  background-color: #005f99;
+  transform: scale(0.96);
+}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <img src="nobibot.png" alt="NOBI BOT">
+      <div class="topbar-name">
+        <strong>👉 NOBI BOT🤘</strong>
+        <span>AI by nobita_huu</span>
+      </div>
+    </div>
+    <div class="topbar-icons">📎 📞 🎥 ⚙️</div>
+  </div>
+  <div id="chat-container">
+    <div id="follow-lock">
+      <img src="nobibot.png" alt="Avatar" />
+      <h3>👉 NOBI BOT🤘</h3>
+      <p>12k followers · 0 posts</p>
+      <p>You both follow nobibot.host</p>
+      <button class="view-btn">View profile</button><br>
+      
+    </div>
+  </div>
+  <div id="typing">
+    <div class="bot-msg-wrapper">
+      <img src="nobibot.png" class="avatar" />
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <span class="typing-dots"></span>
+        <span class="typing-dots"></span>
+        <span class="typing-dots"></span>
+      </div>
+    </div>
+  </div>
+  <div id="input-area">
+    <input type="text" id="message-input" placeholder="Message 👉 NOBI BOT🤘..." autocomplete="off" />
+    <button id="send-btn">➤</button>
+  </div>
+  <script>
+    function setRealVh() {
+      document.documentElement.style.setProperty('--vh', `${window.innerHeight}px`);
+    }
+    setRealVh();
+    window.addEventListener('resize', setRealVh);
+
+    const chatContainer = document.getElementById('chat-container');
+    const input = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const typing = document.getElementById('typing');
+
+    function appendUserMessage(msg) {
+      const div = document.createElement('div');
+      div.className = 'msg user-msg';
+      div.innerText = msg;
+      chatContainer.appendChild(div);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function appendBotMessage(msg) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'bot-msg-wrapper';
+
+      const avatar = document.createElement('img');
+      avatar.src = 'nobibot.png';
+      avatar.alt = 'Bot';
+      avatar.className = 'avatar';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'msg bot-msg';
+      bubble.innerText = msg;
+
+      wrapper.appendChild(avatar);
+      wrapper.appendChild(bubble);
+
+      chatContainer.appendChild(wrapper);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function showTyping(show = true) {
+      typing.style.display = show ? 'block' : 'none';
+    }
+
+    async function sendMessage() {
+      const msg = input.value.trim();
+      if (!msg) return;
+      appendUserMessage(msg);
+      input.value = '';
+      showTyping(true);
+
+      try {
+        const res = await fetch('/api/chatbot/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg })
+        });
+        const data = await res.json();
+
+        setTimeout(() => {
+          showTyping(false);
+          appendBotMessage(data.reply || '...');
+        }, 1000);
+      } catch (e) {
+        showTyping(false);
+        appendBotMessage('NOBI BOT error...');
+      }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  </script>
+</body>
+</html>
