@@ -115,7 +115,7 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
             break;
     }
 
-    const now = new Date();
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     // Using 'en-IN' locale for date and time formatting relevant to India (Patna, Bihar)
     const optionsDate = { year: 'numeric', month: 'long', day: 'numeric' };
     const optionsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
@@ -420,8 +420,28 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         </div>
 
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-        <textarea name="replies" id="replies" required></textarea>
-        <small>
+<textarea name="replies" id="replies" required></textarea>
+
+<button type="button" onclick="toggleVariableList()">🧠 Insert Variable</button>
+<ul id="existingVars" style="display:none; padding:10px; margin-top:10px; border:1px solid #ccc; background:#f9f9f9;">
+    ${customVariables.map(v => `<li style="cursor:pointer;" onclick="insertVariable('%${v.name}%')"><code>%${v.name}%</code></li>`).join('')}
+</ul>
+
+<script>
+function toggleVariableList() {
+    const list = document.getElementById('existingVars');
+    list.style.display = list.style.display === 'none' ? 'block' : 'none';
+}
+function insertVariable(variable) {
+    const textarea = document.getElementById('replies');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    textarea.value = text.substring(0, start) + variable + text.substring(end);
+    textarea.focus();
+    textarea.selectionEnd = start + variable.length;
+}
+</script>
             **Available replacements:**<br>
             **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
             **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
@@ -692,8 +712,29 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             <input name="pattern" id="pattern" value="${r.pattern || ''}" />
         </div>
 
-        <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-        <textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>
+       <label for="replies">Replies (use &lt;#&gt; between lines):</label>
+<textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>
+
+<button type="button" onclick="toggleVariableList()">🧠 Insert Variable</button>
+<ul id="existingVars" style="display:none; padding:10px; margin-top:10px; border:1px solid #ccc; background:#f9f9f9;">
+    ${customVariables.map(v => `<li style="cursor:pointer;" onclick="insertVariable('%${v.name}%')"><code>%${v.name}%</code></li>`).join('')}
+</ul>
+
+<script>
+function toggleVariableList() {
+    const list = document.getElementById('existingVars');
+    list.style.display = list.style.display === 'none' ? 'block' : 'none';
+}
+function insertVariable(variable) {
+    const textarea = document.getElementById('replies');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    textarea.value = text.substring(0, start) + variable + text.substring(end);
+    textarea.focus();
+    textarea.selectionEnd = start + variable.length;
+}
+</script>
         <small>
             **Available replacements:**<br>
             **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
@@ -874,18 +915,35 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
 // GET: Add new variable form
 app.get('/admin/add-variable', isAuthenticated, (req, res) => {
     const addVariableForm = `
-        <form method="POST" action="/admin/add-variable">
-            <h2>Add New Custom Variable</h2>
-            <label for="name">Variable Name (e.g., my_product_name):</label>
-            <input name="name" id="name" placeholder="No spaces, use underscores. Will be used as %name%" required />
-            <small>This name will be wrapped in '%' characters in your replies, e.g., %my_product_name%</small>
-            <label for="value">Variable Value:</label>
-            <textarea name="value" id="value" required></textarea>
-            <button type="submit">Add Variable</button>
-        </form>
-        <br>
-        <a href="/admin/custom-variables">← Back to Custom Variables</a>
-    `;
+    <form method="POST" action="/admin/add-variable">
+        <h2>Add New Custom Variable</h2>
+        <label for="name">Variable Name:</label>
+        <input name="name" id="name" placeholder="e.g. product_name" required />
+
+        <label for="value">Variable Value:</label>
+        <textarea name="value" id="value" required></textarea>
+
+        <button type="button" onclick="toggleVariableList()">🧠 Show Existing Variables</button>
+        <ul id="existingVars" style="display:none; padding: 10px; margin-top: 10px; border: 1px solid #ccc; background: #f9f9f9;">
+            ${variables.map(v => `<li style="cursor:pointer;" onclick="fillVariable('${v.value.replace(/'/g, "\\'")}')"><code>%${v.name}%</code>: ${v.value}</li>`).join('')}
+        </ul>
+
+        <br><br><button type="submit">Add Variable</button>
+    </form>
+
+    <script>
+    function toggleVariableList() {
+        const list = document.getElementById('existingVars');
+        list.style.display = list.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function fillVariable(val) {
+        document.getElementById('value').value = val;
+    }
+    </script>
+    <br>
+    <a href="/admin/custom-variables">← Back to Custom Variables</a>
+`;
     res.send(getHtmlTemplate('Add Variable', addVariableForm));
 });
 
