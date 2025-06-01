@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const MongoStore = require('connect-mongo'); // Make sure this is imported
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
@@ -37,16 +37,25 @@ const Admin = mongoose.model('Admin', AdminSchema);
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
+// --- Session Middleware Configuration (Updated for MongoStore) ---
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'MySuperStrongAndVeryRandomSessionSecretKey123!@#ABCxyz',
-    resave: false,
-    saveUninitialized: false,
+    secret: process.env.SESSION_SECRET || 'fallback_secret_for_local_testing_ONLY_do_not_use_in_prod', // Ensure this is a strong, unique secret
+    resave: false, // Don't save session if unmodified
+    saveUninitialized: false, // Don't create session until something stored
     store: MongoStore.create({
-        mongoUrl: process.env.MONGODB_URI || 'mongodb+srv://dontchange365:DtUiOMFzQVM0tG9l@nobifeedback.9ntuipc.mongodb.net/?retryWrites=true&w=majority&appName=nobifeedback',
-        ttl: 1000 * 60 * 60 * 24
+        mongoUrl: MONGO_URI, // Direct reference to your MONGO_URI constant
+        ttl: 1000 * 60 * 60 * 24, // Session will expire in 24 hours (in seconds)
+        autoRemove: 'interval', // Remove expired sessions automatically
+        autoRemoveInterval: 60 // Check for expired sessions every 60 minutes
     }),
-    cookie: { maxAge: 1000 * 60 * 60 * 24, secure: process.env.NODE_ENV === 'production' }
+    cookie: {
+        maxAge: 1000 * 60 * 60 * 24, // Cookie valid for 24 hours
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
+        httpOnly: true, // Prevent client-side JavaScript from accessing cookies
+        sameSite: 'lax' // CSRF protection
+    }
 }));
+// --- End Session Middleware Configuration ---
 
 app.use(express.static(path.join(__dirname, 'public')));
 
