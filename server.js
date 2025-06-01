@@ -34,6 +34,7 @@ const Admin = mongoose.model('Admin', AdminSchema);
 
 // Chat Reply Schema
 const ChatReplySchema = new mongoose.Schema({
+    ruleName: { type: String, required: true }, // ✅ ADD THIS
     type: { type: String, required: true },
     keyword: String,
     pattern: String,
@@ -172,6 +173,8 @@ app.get('/admin/logout', (req, res) => {
 app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
     const addReplyForm = `
     <form method="POST" action="/admin/add-chat-replies" id="replyForm">
+        <label for="ruleName">Rule Name:</label>
+        <input name="ruleName" id="ruleName" placeholder="e.g. Greet User" required />
         <h2>Add Chat Reply</h2>
         <label for="type">Type:</label>
         <select name="type" id="type" required onchange="handleTypeChange()">
@@ -239,7 +242,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
 });
 
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
-    const { type, keyword, pattern, replies, priority, isDefault } = req.body;
+    const { ruleName, type, keyword, pattern, replies, priority, isDefault } = req.body;
     if (!replies) return res.send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>'));
 
     if (type === 'default_message' && isDefault === 'true') {
@@ -247,13 +250,14 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     }
 
     const newReply = new ChatReply({
-        type,
-        keyword: keyword || '',
-        pattern: pattern || '',
-        replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
-        priority: parseInt(priority),
-        isDefault: isDefault === 'true'
-    });
+    ruleName,
+    type,
+    keyword: keyword || '',
+    pattern: pattern || '',
+    replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
+    priority: parseInt(priority),
+    isDefault: isDefault === 'true'
+});
 
     await newReply.save();
     res.redirect('/admin/reply-list');
@@ -264,6 +268,7 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const replies = await ChatReply.find().sort({ priority: -1 });
     const list = replies.map(r => `
     <tr>
+        <td>${r.ruleName}</td>
         <td>${r.type}</td>
         <td>${r.keyword}</td>
         <td>${r.priority}</td>
@@ -279,6 +284,7 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     <table>
         <thead>
             <tr>
+                <th>Rule Name</th>
                 <th>Type</th>
                 <th>Keywords</th>
                 <th>Priority</th>
@@ -304,6 +310,8 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     }
     const editReplyForm = `
     <form method="POST" action="/admin/edit-reply/${r._id}">
+        <label for="ruleName">Rule Name:</label>
+        <input name="ruleName" id="ruleName" value="${r.ruleName}" required />
         <h2>Edit Reply</h2>
         <label for="type">Type:</label>
         <input name="type" id="type" value="${r.type}" readonly />
@@ -361,14 +369,15 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
 });
 
 app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
-    const { keyword, pattern, replies, priority, isDefault } = req.body;
+    const { ruleName, keyword, pattern, replies, priority, isDefault } = req.body;
     const update = {
-        keyword: keyword || '',
-        pattern: pattern || '',
-        replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
-        priority: parseInt(priority),
-        isDefault: isDefault === 'true'
-    };
+    ruleName,
+    keyword: keyword || '',
+    pattern: pattern || '',
+    replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
+    priority: parseInt(priority),
+    isDefault: isDefault === 'true'
+};
     if (update.isDefault) {
         await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
     }
