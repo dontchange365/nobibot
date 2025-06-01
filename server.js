@@ -158,26 +158,6 @@ app.get('/admin/logout', (req, res) => {
     });
 });
 
-// TEMPORARY ROUTE - ISKO ADMIN BANANE KE BAAD TURANT HATA DENA!
-app.get('/create-first-admin-secret-route', async (req, res) => {
-    const username = process.env.ADMIN_USERNAME;
-    const password = process.env.ADMIN_PASSWORD;
-    try {
-        const existingAdmin = await Admin.findOne({ username });
-        if (existingAdmin) {
-            return res.send(`Admin user '${username}' already exists. REMOVE THIS ROUTE NOW!`);
-        }
-        const newAdmin = new Admin({ username, password });
-        await newAdmin.save();
-        res.send(`Admin user '${username}' created successfully! REMOVE THIS ROUTE NOW!`);
-    } catch (error) {
-        console.error(error);
-        res.status(500).send('Error creating admin user.');
-    }
-});
-// TEMPORARY ROUTE END - ISKO HAMESHA DELETE KARNA HAI!
-
-
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log('Open your browser and go to http://localhost:3000/admin/login to access the login page.');
