@@ -254,6 +254,28 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
         </div>
     </div>
     <script>
+    // Default variables defined already (don't remove that array)
+
+    let allVariables = [...defaultVariables]; // Make a fresh copy of default
+
+    // Fetch custom variables from backend and merge
+    fetch('/api/custom-variables')
+      .then(res => res.json())
+      .then(customVars => {
+        customVars.forEach(function(v) {
+          allVariables.push({
+            name: '%' + v.name + '%',
+            type: 'Custom',
+            value: v.value
+          });
+        });
+        displayVariables(allVariables); // This will now include custom ones
+      })
+      .catch(err => {
+        console.error('Error loading custom variables:', err);
+        document.getElementById('variableList').innerHTML = '<p>Failed to load custom variables.</p>';
+      });
+    
     function handleTypeChange() {
         const type = document.getElementById('type').value;
         const keywordField = document.getElementById('keywordField');
