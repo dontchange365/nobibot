@@ -199,13 +199,16 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
     <form method="POST" action="/admin/add-chat-replies" id="replyForm">
         <label for="ruleName">Rule Name:</label>
         <input name="ruleName" id="ruleName" placeholder="e.g. Greet User" required />
+
         <label for="sendMethod">Send Method:</label>
-<select name="sendMethod" id="sendMethod">
-    <option value="random">Random</option>
-    <option value="all">All</option>
-    <option value="once">Once (first one)</option>
-</select>
+        <select name="sendMethod" id="sendMethod">
+            <option value="random">Random</option>
+            <option value="all">All</option>
+            <option value="once">Once (first one)</option>
+        </select>
+
         <h2>Add Chat Reply</h2>
+
         <label for="type">Type:</label>
         <select name="type" id="type" required onchange="handleTypeChange()">
             <option value="">--Select Type--</option>
@@ -228,7 +231,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
 
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <textarea name="replies" id="replies" required></textarea>
-        <button type="button" id="insertVariableBtn" style="margin-top: 5px; padding: 8px 12px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Insert Variable</button>
+
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="0" />
 
@@ -241,213 +244,52 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
         </div>
 
         <button type="submit">Add Reply</button>
+
+        <h3>🧩 Available Variables:</h3>
+        <div id="variableList" style="font-family: monospace; white-space: pre-wrap;"></div>
     </form>
 
-    <div id="variableModal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color: rgba(0,0,0,0.4);">
-        <div style="background-color:#fefefe; margin: 10% auto; padding:20px; border:1px solid #888; width:80%; max-width:600px; border-radius: 8px; position: relative;">
-            <span id="closeModalBtn" style="color:#aaa; float:right; font-size:28px; font-weight:bold; cursor:pointer;">&times;</span>
-            <h3>Select Variable to Insert</h3>
-            <input type="text" id="variableSearch" placeholder="Search variables..." style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #ddd; border-radius:4px;">
-            <div id="variableList" style="max-height:300px; overflow-y:auto; border:1px solid #eee; padding:5px; border-radius:4px;">
-                </div>
-            <button type="button" onclick="document.getElementById('variableModal').style.display='none'" style="margin-top:15px; padding:8px 15px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
-        </div>
-    </div>
     <script>
-    // Default variables defined already (don't remove that array)
+    function handleTypeChange() {
+        const type = document.getElementById('type').value;
+        document.getElementById('keywordField').style.display = (type === 'exact_match' || type === 'pattern_matching') ? 'block' : 'none';
+        document.getElementById('patternField').style.display = (type === 'expert_pattern_matching') ? 'block' : 'none';
+        document.getElementById('isDefaultField').style.display = (type === 'default_message') ? 'block' : 'none';
+    }
 
-    let allVariables = [...defaultVariables]; // Make a fresh copy of default
+    const defaultVariables = [
+      { name: "%DAYOFMONTH%", type: "Default", value: "01" },
+      { name: "%MONTH%", type: "Default", value: "June" },
+      { name: "%YEAR%", type: "Default", value: "2025" },
+      { name: "%HOUR%", type: "Default", value: "12" },
+      { name: "%MINUTE%", type: "Default", value: "00" },
+      { name: "%SECOND%", type: "Default", value: "00" },
+      { name: "%DAYNAME%", type: "Default", value: "Sunday" },
+      { name: "%TIMESTAMP%", type: "Default", value: "June 2, 2025, 12:00 PM" }
+    ];
 
-    // Fetch custom variables from backend and merge
+    function displayVariables(vars) {
+      const list = vars.map(v => \`\${v.name.padEnd(25)} | \${v.type} | \${v.value}\`).join('\\n');
+      document.getElementById('variableList').textContent = list;
+    }
+
+    let allVariables = [...defaultVariables];
+
     fetch('/api/custom-variables')
       .then(res => res.json())
       .then(customVars => {
-        customVars.forEach(function(v) {
-          allVariables.push({
-            name: '%' + v.name + '%',
-            type: 'Custom',
-            value: v.value
-          });
+        customVars.forEach(v => {
+          allVariables.push({ name: \`%\${v.name}%\`, type: 'Custom', value: v.value });
         });
-        displayVariables(allVariables); // This will now include custom ones
+        displayVariables(allVariables);
       })
       .catch(err => {
-        console.error('Error loading custom variables:', err);
-        document.getElementById('variableList').innerHTML = '<p>Failed to load custom variables.</p>';
+        console.error('Error loading variables:', err);
+        document.getElementById('variableList').innerHTML = '<p>Failed to load variables.</p>';
       });
-    
-    function handleTypeChange() {
-        const type = document.getElementById('type').value;
-        const keywordField = document.getElementById('keywordField');
-        const patternField = document.getElementById('patternField');
-        const isDefaultField = document.getElementById('isDefaultField');
-
-        keywordField.style.display = 'none';
-        patternField.style.display = 'none';
-        isDefaultField.style.display = 'none';
-
-        if (type === 'exact_match' || type === 'pattern_matching') {
-            keywordField.style.display = 'block';
-        }
-
-        if (type === 'expert_pattern_matching') {
-            patternField.style.display = 'block';
-        }
-
-        if (type === 'default_message') {
-            isDefaultField.style.display = 'block';
-        }
-    }
-
-    // --- NEW JAVASCRIPT FOR VARIABLE MODAL ---
-    document.addEventListener('DOMContentLoaded', () => {
-        handleTypeChange(); // Call this to set initial field visibility
-
-        const insertVariableBtn = document.getElementById('insertVariableBtn');
-        const variableModal = document.getElementById('variableModal');
-        const closeModalBtn = document.getElementById('closeModalBtn');
-        const variableList = document.getElementById('variableList');
-        const variableSearch = document.getElementById('variableSearch');
-        const repliesTextarea = document.getElementById('replies');
-
-        let allVariables = []; // To store all variables including custom ones
-
-        const defaultVariables = [
-            // Date/Time
-            { name: '%DAYOFMONTH%', type: 'Date/Time' },
-            { name: '%DAYOFMONTH_SHORT%', type: 'Date/Time' },
-            { name: '%MONTH%', type: 'Date/Time' },
-            { name: '%MONTH_SHORT%', type: 'Date/Time' },
-            { name: '%YEAR%', type: 'Date/Time' },
-            { name: '%YEAR_SHORT%', type: 'Date/Time' },
-            { name: '%DAYNAME%', type: 'Date/Time' },
-            { name: '%DAYNAME_SHORT%', type: 'Date/Time' },
-            { name: '%HOUR%', type: 'Date/Time' }, // 24-hour format
-            { name: '%MINUTE%', type: 'Date/Time' },
-            { name: '%SECOND%', type: 'Date/Time' },
-            { name: '%TIMESTAMP%', type: 'Date/Time' },
-            { name: '%HOUR12%', type: 'Date/Time' },
-            { name: '%HOUR12_WITH_AMPM%', type: 'Date/Time' },
-            { name: '%HOUR24%', type: 'Date/Time' }, // Same as %HOUR%
-            { name: '%AMPM%', type: 'Date/Time' }, // AM or PM
-            { name: '%DAYOFYEAR%', type: 'Date/Time' },
-            { name: '%WEEKOFYEAR%', type: 'Date/Time' },
-            // Random Generators
-            { name: '%RANDOM_ASCII_SYMBOL_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_A-Z_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_A-Z_0-9_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_a-z_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_a-z_0-9_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_a-z_A-Z_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_a-z_A-Z_0-9_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_CUSTOM_<LENGTH>_<OPT1,OPT2,...>%', type: 'Random' },
-            { name: '%RANDOM_NUMBER_<MIN>-<MAX>%', type: 'Random' },
-            // Placeholder for advanced variables (will need backend integration later)
-            { name: '%RECEIVED_MESSAGE_<MAXLENGTH>%', type: 'Advanced (Placeholder)' },
-            { name: '%PREVIOUS_MESSAGE_<RULEID1,RULEID2,...>_<OFFSET>%', type: 'Advanced (Placeholder)' },
-            { name: '%REPLY_COUNT_OVERALL%', type: 'Advanced (Placeholder)' },
-            { name: '%RULE_ID%', type: 'Advanced (Placeholder)' },
-            { name: '%NAME%', type: 'Advanced (Placeholder)' }, // User's name
-            { name: '%CAPTURING_GROUP_<ID>%', type: 'Advanced (Placeholder)' }, // For Regex captures
-        ];
-
-        async function loadVariables() {
-            try {
-                const response = await fetch('/api/custom-variables'); // New API endpoint to fetch custom variables
-                const customVars = await response.json();
-                allVariables = defaultVariables;
-customVars.forEach(v => {
-  allVariables.push({ name: `%${v.name}%`, type: 'Custom', value: v.value });
-});
-                displayVariables(allVariables);
-            } catch (error) {
-                console.error('Error loading variables:', error);
-                variableList.innerHTML = '<p>Error loading variables. Please try again.</p>';
-            }
-        }
-
-        function displayVariables(variablesToDisplay) {
-            variableList.innerHTML = '';
-            if (variablesToDisplay.length === 0) {
-                variableList.innerHTML = '<p>No variables found.</p>';
-                return;
-            }
-
-            const groupedVariables = variablesToDisplay.reduce((acc, varObj) => {
-                (acc[varObj.type] = acc[varObj.type] || []).push(varObj);
-                return acc;
-            }, {});
-
-            // Sort types for consistent display order
-            const sortedTypes = ['Date/Time', 'Random', 'Custom', 'Advanced (Placeholder)'].filter(type => groupedVariables[type]);
-
-            sortedTypes.forEach(type => {
-                const typeHeader = document.createElement('h4');
-                typeHeader.textContent = type;
-                typeHeader.style.marginTop = '10px';
-                typeHeader.style.marginBottom = '5px';
-                typeHeader.style.color = '#333';
-                variableList.appendChild(typeHeader);
-
-                groupedVariables[type].forEach(varObj => {
-                    const varItem = document.createElement('div');
-                    varItem.className = 'variable-item';
-                    varItem.style.padding = '8px';
-                    varItem.style.borderBottom = '1px solid #eee';
-                    varItem.style.cursor = 'pointer';
-                    varItem.style.backgroundColor = '#f9f9f9';
-                    varItem.style.marginBottom = '2px';
-                    varItem.style.borderRadius = '3px';
-                    varItem.style.transition = 'background-color 0.2s';
-                    varItem.onmouseover = () => varItem.style.backgroundColor = '#e6e6e6';
-                    varItem.onmouseout = () => varItem.style.backgroundColor = '#f9f9f9';
-
-
-                    varItem.innerHTML = `<strong>${varObj.name}</strong> ${varObj.type === 'Custom' ? `<small>(Value: ${varObj.value.slice(0, 50)}${varObj.value.length > 50 ? '...' : ''})</small>` : ''}`;
-
-                    varItem.onclick = () => {
-                        const cursorPos = repliesTextarea.selectionStart;
-                        const textBefore = repliesTextarea.value.substring(0, cursorPos);
-                        const textAfter = repliesTextarea.value.substring(cursorPos, repliesTextarea.value.length);
-                        repliesTextarea.value = textBefore + varObj.name + textAfter;
-                        repliesTextarea.selectionStart = repliesTextarea.selectionEnd = cursorPos + varObj.name.length;
-                        variableModal.style.display = 'none';
-                        repliesTextarea.focus(); // Focus back on textarea
-                    };
-                    variableList.appendChild(varItem);
-                });
-            });
-        }
-    }
-
-    insertVariableBtn.addEventListener('click', () => {
-        loadVariables(); // Load and display variables every time button is clicked
-        variableModal.style.display = 'block';
-        variableSearch.value = ''; // Clear search on open
-        variableSearch.focus(); // Focus search input
-    });
-
-    closeModalBtn.addEventListener('click', () => {
-        variableModal.style.display = 'none';
-    });
-
-    window.addEventListener('click', (event) => {
-        if (event.target == variableModal) {
-            variableModal.style.display = 'none';
-        }
-    });
-
-    variableSearch.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const filteredVariables = allVariables.filter(varObj =>
-            varObj.name.toLowerCase().includes(searchTerm) ||
-            (varObj.type === 'Custom' && varObj.value.toLowerCase().includes(searchTerm))
-        );
-        displayVariables(filteredVariables);
-    });
-    });
     </script>
     `;
+
     res.send(getHtmlTemplate('Add Chat Reply', addReplyForm));
 });
 
