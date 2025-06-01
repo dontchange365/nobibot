@@ -307,23 +307,56 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         <h2>Edit Reply</h2>
         <label for="type">Type:</label>
         <input name="type" id="type" value="${r.type}" readonly />
-        <label for="keyword">Keyword(s):</label>
-        <input name="keyword" id="keyword" value="${r.keyword || ''}" />
-        <label for="pattern">Regex Pattern:</label>
-        <input name="pattern" id="pattern" value="${r.pattern || ''}" />
+
+        <div id="keywordField" style="display:none;">
+            <label for="keyword">Keyword(s):</label>
+            <input name="keyword" id="keyword" value="${r.keyword || ''}" />
+        </div>
+
+        <div id="patternField" style="display:none;">
+            <label for="pattern">Regex Pattern:</label>
+            <input name="pattern" id="pattern" value="${r.pattern || ''}" />
+        </div>
+
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>
+
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="${r.priority}" />
-        <label for="isDefault">Is Default?</label>
-        <select name="isDefault" id="isDefault">
-            <option value="false" ${!r.isDefault ? 'selected' : ''}>No</option>
-            <option value="true" ${r.isDefault ? 'selected' : ''}>Yes</option>
-        </select>
+
+        <div id="isDefaultField" style="display:none;">
+            <label for="isDefault">Is Default?</label>
+            <select name="isDefault" id="isDefault">
+                <option value="false" ${!r.isDefault ? 'selected' : ''}>No</option>
+                <option value="true" ${r.isDefault ? 'selected' : ''}>Yes</option>
+            </select>
+        </div>
+
         <button type="submit">Update Reply</button>
     </form>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const type = "${r.type}";
+        const keywordField = document.getElementById('keywordField');
+        const patternField = document.getElementById('patternField');
+        const isDefaultField = document.getElementById('isDefaultField');
+
+        if (type === 'exact_match' || type === 'pattern_matching') {
+            keywordField.style.display = 'block';
+        }
+        if (type === 'expert_pattern_matching') {
+            patternField.style.display = 'block';
+        }
+        if (type === 'default_message') {
+            isDefaultField.style.display = 'block';
+        }
+    });
+    </script>
+
     <br>
-    <a href="/admin/reply-list">← Back to Reply List</a>`;
+    <a href="/admin/reply-list">← Back to Reply List</a>
+    `;
     res.send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
 });
 
