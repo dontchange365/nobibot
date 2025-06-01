@@ -1,73 +1,100 @@
-// server.js
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chatbot</title>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f4f4f4; }
+        .chat-container { background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 400px; display: flex; flex-direction: column; height: 500px; overflow: hidden; }
+        .chat-messages { flex-grow: 1; padding: 20px; overflow-y: auto; border-bottom: 1px solid #eee; }
+        .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 5px; max-width: 80%; }
+        .message.user { background-color: #007bff; color: white; align-self: flex-end; margin-left: auto; }
+        .message.bot { background-color: #e2e6ea; color: #333; align-self: flex-start; margin-right: auto; }
+        .chat-input { display: flex; padding: 15px; border-top: 1px solid #eee; }
+        .chat-input input { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-right: 10px; }
+        .chat-input button { padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .chat-input button:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+            </div>
+        <div class="chat-input">
+            <input type="text" id="message-input" placeholder="Type your message...">
+            <button id="send-button">Send</button>
+        </div>
+    </div>
 
-const express = require('express');
-const http = require('http'); // Node.js built-in HTTP module
-const socketIo = require('socket.io');
-const mongoose = require('mongoose');
-const path = require('path'); // Node.js built-in path module
+    <script>
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const chatMessages = document.getElementById('chat-messages');
 
-const app = express();
-const server = http.createServer(app); // Create HTTP server using Express app
-const io = new socketIo.Server(server); // Initialize Socket.IO with the HTTP server
+        // Function to display a message in the chat
+        function displayMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender);
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+        }
 
-const PORT = process.env.PORT || 3000;
-const MONGODB_URI = 'mongodb://localhost:27017/instagram_chat'; // Your MongoDB connection string
+        // Function to send a message to the server
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (text === '') return;
 
-// --- MongoDB Connection ---
-mongoose.connect(MONGODB_URI)
-    .then(() => console.log('MongoDB connected successfully!'))
-    .catch(err => console.error('MongoDB connection error:', err));
+            displayMessage(text, 'user'); // Display user's message immediately
+            messageInput.value = ''; // Clear input
 
-// --- Message Schema and Model ---
-const messageSchema = new mongoose.Schema({
-    username: String, // To differentiate sender (e.g., 'You' or 'Other')
-    text: String,
-    timestamp: { type: Date, default: Date.now }
-});
-const Message = mongoose.model('Message', messageSchema);
+            try {
+                const response = await fetch('/api/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text })
+                });
 
-// --- Serve Static Files ---
-// This tells Express to serve your HTML, CSS, JS from the current directory.
-app.use(express.static(__dirname));
+                const data = await response.json();
+                if (response.ok) {
+                    displayMessage(data.botMessage.text, 'bot'); // Display bot's reply
+                } else {
+                    console.error('Error from server:', data.error);
+                    displayMessage('Error: Could not get a reply from the bot.', 'bot');
+                }
+            } catch (error) {
+                console.error('Network error:', error);
+                displayMessage('Error: Could not connect to the server.', 'bot');
+            }
+        }
 
-// --- Socket.IO Connection Handling ---
-io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id);
-
-    // Send existing messages to the new user
-    Message.find().sort({ timestamp: 1 }).limit(50) // Fetch last 50 messages
-        .then(messages => {
-            socket.emit('load_messages', messages);
-        })
-        .catch(err => console.error('Error loading messages:', err));
-
-    // Handle incoming messages
-    socket.on('chat_message', (msg) => {
-        console.log('message: ' + msg.text + ' from ' + msg.username);
-
-        // Create a new message document
-        const newMessage = new Message({
-            username: msg.username, // This will be 'You' from client for now
-            text: msg.text
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
         });
 
-        // Save message to database
-        newMessage.save()
-            .then(() => {
-                // Emit the message to all connected clients
-                io.emit('chat_message', newMessage); // Emit the saved message (with ID and timestamp)
-            })
-            .catch(err => console.error('Error saving message:', err));
-    });
+        // Optional: Load chat history when the page loads
+        async function loadChatHistory() {
+            try {
+                const response = await fetch('/api/messages');
+                const messages = await response.json();
+                if (response.ok) {
+                    messages.forEach(msg => displayMessage(msg.text, msg.sender));
+                } else {
+                    console.error('Error loading history:', messages.error);
+                }
+            } catch (error) {
+                console.error('Network error loading history:', error);
+            }
+        }
 
-    // Handle disconnect
-    socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-    });
-});
-
-// --- Start the Server ---
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Open your browser at http://localhost:${PORT}`);
-});
+        loadChatHistory(); // Call this on page load
+    </script>
+</body>
+</html>
