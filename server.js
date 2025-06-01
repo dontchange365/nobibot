@@ -171,31 +171,70 @@ app.get('/admin/logout', (req, res) => {
 // ADD REPLY FORM
 app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
     const addReplyForm = `
-    <form method="POST" action="/admin/add-chat-replies">
+    <form method="POST" action="/admin/add-chat-replies" id="replyForm">
         <h2>Add Chat Reply</h2>
         <label for="type">Type:</label>
-        <select name="type" id="type" required>
+        <select name="type" id="type" required onchange="handleTypeChange()">
+            <option value="">--Select Type--</option>
             <option value="exact_match">Exact Match</option>
             <option value="pattern_matching">Pattern Matching</option>
             <option value="expert_pattern_matching">Expert Regex</option>
             <option value="welcome_message">Welcome Message</option>
             <option value="default_message">Default Message</option>
         </select>
-        <label for="keyword">Keyword(s) (comma separated):</label>
-        <input name="keyword" id="keyword" placeholder="e.g. hi, hello" />
-        <label for="pattern">Regex Pattern:</label>
-        <input name="pattern" id="pattern" placeholder="Only for Expert Regex" />
+
+        <div id="keywordField" style="display:none;">
+            <label for="keyword">Keyword(s):</label>
+            <input name="keyword" id="keyword" placeholder="e.g. hi, hello" />
+        </div>
+
+        <div id="patternField" style="display:none;">
+            <label for="pattern">Regex Pattern:</label>
+            <input name="pattern" id="pattern" placeholder="Only for Expert Regex" />
+        </div>
+
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-        <textarea name="replies" id="replies"></textarea>
+        <textarea name="replies" id="replies" required></textarea>
+
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="0" />
-        <label for="isDefault">Is Default?</label>
-        <select name="isDefault" id="isDefault">
-            <option value="false">No</option>
-            <option value="true">Yes</option>
-        </select>
+
+        <div id="isDefaultField" style="display:none;">
+            <label for="isDefault">Is Default?</label>
+            <select name="isDefault" id="isDefault">
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+            </select>
+        </div>
+
         <button type="submit">Add Reply</button>
-    </form>`;
+    </form>
+
+    <script>
+    function handleTypeChange() {
+        const type = document.getElementById('type').value;
+        const keywordField = document.getElementById('keywordField');
+        const patternField = document.getElementById('patternField');
+        const isDefaultField = document.getElementById('isDefaultField');
+
+        keywordField.style.display = 'none';
+        patternField.style.display = 'none';
+        isDefaultField.style.display = 'none';
+
+        if (type === 'exact_match' || type === 'pattern_matching') {
+            keywordField.style.display = 'block';
+        }
+
+        if (type === 'expert_pattern_matching') {
+            patternField.style.display = 'block';
+        }
+
+        if (type === 'default_message') {
+            isDefaultField.style.display = 'block';
+        }
+    }
+    </script>
+    `;
     res.send(getHtmlTemplate('Add Chat Reply', addReplyForm));
 });
 
