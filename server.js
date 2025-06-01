@@ -289,40 +289,71 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 // REPLY LIST
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const replies = await ChatReply.find().sort({ priority: -1 });
-    const list = replies.map(r => `
-    <tr>
-        <td>${r.ruleName}</td>
-        <td>${r.type}</td>
-        <td>${r.keyword}</td>
-        <td>${r.priority}</td>
-        <td>${r.replies.slice(0, 2).join(' | ')}${r.replies.length > 2 ? '...' : ''}</td>
-        <td>${r.isDefault ? '✅' : ''}</td>
-        <td>
-            <a href="/admin/edit-reply/${r._id}">✏️</a>
-            <a href="/admin/delete-reply/${r._id}" onclick="return confirm('Are you sure you want to delete this reply?')">🗑️</a>
-        </td>
-    </tr>`).join('');
-    const replyListContent = `
-    <h2>Chat Replies</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Rule Name</th>
-                <th>Type</th>
-                <th>Keywords</th>
-                <th>Priority</th>
-                <th>Replies</th>
-                <th>Default</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${list}
-        </tbody>
-    </table>
+
+    const list = replies.map(r => {
+        const keywordDisplay = r.keyword ? r.keyword.slice(0, 40) + (r.keyword.length > 40 ? "..." : "") : '';
+        return `
+        <div class="reply-card">
+            <h3>${r.ruleName}</h3>
+            <p><strong>Type:</strong> ${r.type}</p>
+            ${keywordDisplay ? `<p><strong>Keywords:</strong> ${keywordDisplay}</p>` : ''}
+            <div class="actions">
+                <a href="/admin/edit-reply/${r._id}" class="edit-btn">✏️ Edit</a>
+                <a href="/admin/delete-reply/${r._id}" class="delete-btn" onclick="return confirm('Are you sure you want to delete this reply?')">🗑️ Delete</a>
+            </div>
+        </div>
+        `;
+    }).join('');
+
+    const html = `
+    <h2>All Chatbot Rules</h2>
+    <div class="reply-list">
+        ${list}
+    </div>
     <br>
-    <a href="/admin/dashboard">← Back to Dashboard</a>`;
-    res.send(getHtmlTemplate('Chat Reply List', replyListContent));
+    <a href="/admin/dashboard">← Back to Dashboard</a>
+
+    <style>
+        .reply-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .reply-card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .reply-card h3 {
+            margin-bottom: 10px;
+            color: #111;
+        }
+        .reply-card p {
+            margin: 5px 0;
+        }
+        .actions {
+            margin-top: 15px;
+        }
+        .edit-btn, .delete-btn {
+            padding: 8px 14px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .edit-btn {
+            background: #2563eb;
+            color: #fff;
+        }
+        .delete-btn {
+            background: #ef4444;
+            color: #fff;
+        }
+    </style>
+    `;
+
+    res.send(getHtmlTemplate('Chat Reply List', html));
 });
 
 // EDIT REPLY
