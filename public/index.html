@@ -305,6 +305,11 @@
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter') sendMessage();
     });
+    function setRealVh() {
+    document.documentElement.style.setProperty('--vh', `${window.innerHeight}px`);
+  }
+  setRealVh();
+  window.addEventListener('resize', setRealVh);
   </script>
 </body>
 </html>
