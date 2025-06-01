@@ -336,13 +336,37 @@ app.post('/admin/login', async (req, res) => {
 // ADMIN DASHBOARD
 app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     const dashboardContent = `
-        <h1>Welcome Admin: ${req.session.username}</h1>
-        <div class="admin-links">
-            <a href="/admin/add-chat-replies">Add Chat Reply</a>
-            <a href="/admin/reply-list">View Replies</a>
-            <a href="/admin/custom-variables">Manage Custom Variables</a>
-            <a href="/admin/logout">Logout</a>
-        </div>`;
+    <h1>Welcome Admin: ${req.session.username}</h1>
+    <ul class="admin-links-list">
+        <li><a href="/admin/add-chat-replies">➕ Add Chat Reply</a></li>
+        <li><a href="/admin/reply-list">📃 View Replies</a></li>
+        <li><a href="/admin/custom-variables">🔧 Manage Custom Variables</a></li>
+        <li><a href="/admin/logout">🚪 Logout</a></li>
+    </ul>
+    <style>
+        .admin-links-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .admin-links-list li a {
+            display: block;
+            background-color: #4f46e5;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 16px;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+        .admin-links-list li a:hover {
+            background-color: #4338ca;
+        }
+    </style>
+`;
     res.send(getHtmlTemplate('Admin Dashboard', dashboardContent));
 });
 
@@ -867,25 +891,28 @@ app.get('/admin/add-variable', isAuthenticated, (req, res) => {
 
 // POST: Handle adding new variable
 app.post('/admin/add-variable', isAuthenticated, async (req, res) => {
-    const { name, value } = req.body;
+    let { name, value } = req.body;
     if (!name || !value) {
-        return res.send(getHtmlTemplate('Error', '<p>Variable name and value are required.</p><br><a href="/admin/add-variable">Back to Add Variable</a>'));
+        return res.send(getHtmlTemplate('Error', '<p>Variable name and value are required.</p><br><a href="/admin/add-variable">Back</a>'));
     }
-    // Basic validation for variable name (e.g., no spaces, only alphanumeric and underscores)
-    if (!/^[a-zA-Z0-9_]+$/.test(name)) {
-        return res.send(getHtmlTemplate('Error', '<p>Variable name must contain only alphanumeric characters and underscores (no spaces).</p><br><a href="/admin/add-variable">Back to Add Variable</a>'));
+
+    // Clean: space to underscore, lowercase
+    name = name.trim().replace(/\s+/g, '_').toLowerCase();
+
+    if (!/^[a-z0-9_]+$/.test(name)) {
+        return res.send(getHtmlTemplate('Error', '<p>Variable name must contain only letters, numbers, and underscores.</p><br><a href="/admin/add-variable">Back</a>'));
     }
 
     try {
-        const newVariable = new CustomVariable({ name: name.trim(), value: value.trim() });
+        const newVariable = new CustomVariable({ name, value: value.trim() });
         await newVariable.save();
         res.redirect('/admin/custom-variables');
     } catch (error) {
-        if (error.code === 11000) { // Duplicate key error
-            return res.send(getHtmlTemplate('Error', '<p>A variable with this name already exists.</p><br><a href="/admin/add-variable">Back to Add Variable</a>'));
+        if (error.code === 11000) {
+            return res.send(getHtmlTemplate('Error', '<p>This variable already exists.</p><br><a href="/admin/add-variable">Back</a>'));
         }
         console.error("Error adding variable:", error);
-        res.send(getHtmlTemplate('Error', '<p>Error adding custom variable.</p><br><a href="/admin/add-variable">Back to Add Variable</a>'));
+        res.send(getHtmlTemplate('Error', '<p>Server error while adding variable.</p><br><a href="/admin/add-variable">Back</a>'));
     }
 });
 
