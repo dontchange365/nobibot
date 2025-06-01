@@ -3,27 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Chatbot</title>
+    <title>Insta-Chat</title>
     <style>
-        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f4f4f4; }
-        .chat-container { background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 400px; display: flex; flex-direction: column; height: 500px; overflow: hidden; }
-        .chat-messages { flex-grow: 1; padding: 20px; overflow-y: auto; border-bottom: 1px solid #eee; }
-        .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 5px; max-width: 80%; }
-        .message.user { background-color: #007bff; color: white; align-self: flex-end; margin-left: auto; }
-        .message.bot { background-color: #e2e6ea; color: #333; align-self: flex-start; margin-right: auto; }
-        .chat-input { display: flex; padding: 15px; border-top: 1px solid #eee; }
-        .chat-input input { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-right: 10px; }
-        .chat-input button { padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        .chat-input button:hover { background-color: #218838; }
+        /* Basic Reset & Font */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #fafafa; /* Instagram background */
+            color: #262626; /* Instagram text color */
+        }
+
+        /* Chat Container */
+        .chat-container {
+            width: 100%;
+            max-width: 450px; /* Typical mobile chat width */
+            height: 90vh; /* Make it almost full height */
+            background-color: #fff;
+            border: 1px solid #dbdbdb; /* Subtle border */
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+        }
+
+        /* Chat Header (Top Bar) */
+        .chat-header {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #efefef; /* Lighter border */
+            background-color: #fff;
+            font-weight: 600;
+            font-size: 16px;
+            color: #262626;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .chat-header .back-icon {
+            font-size: 24px;
+            margin-right: 15px;
+            cursor: pointer;
+            color: #262626;
+        }
+        .chat-header .profile-pic {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 10px;
+        }
+        .chat-header .username {
+            flex-grow: 1; /* Pushes icons to the right */
+        }
+        .chat-header .header-icons span {
+            font-size: 22px;
+            margin-left: 20px;
+            cursor: pointer;
+            color: #262626;
+        }
+
+        /* Chat Messages Area */
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column; /* Messages stack vertically */
+            gap: 8px; /* Space between messages */
+            background-color: #fafafa; /* Light background for chat area */
+        }
+        .message {
+            max-width: 75%; /* Messages don't take full width */
+            padding: 10px 14px;
+            border-radius: 20px; /* Rounded corners like Insta */
+            word-wrap: break-word; /* Prevents long words from breaking layout */
+            line-height: 1.4;
+            font-size: 15px;
+        }
+        .message.user {
+            background-color: #e0f2fe; /* Light blue, similar to Insta's send bubble */
+            color: #262626;
+            align-self: flex-end; /* Align to right */
+            border-bottom-right-radius: 4px; /* Slightly less rounded on one corner */
+        }
+        .message.bot { /* Assuming 'bot' is like the other person */
+            background-color: #efefef; /* Light grey for incoming */
+            color: #262626;
+            align-self: flex-start; /* Align to left */
+            border-bottom-left-radius: 4px; /* Slightly less rounded on one corner */
+        }
+
+        /* Chat Input Area */
+        .chat-input {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            border-top: 1px solid #efefef;
+            background-color: #fff;
+            gap: 10px; /* Space between input and button */
+        }
+        .chat-input .emoji-icon, .chat-input .gallery-icon, .chat-input .mic-icon {
+            font-size: 24px;
+            color: #8e8e8e; /* Lighter grey for icons */
+            cursor: pointer;
+        }
+        .chat-input input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid #dbdbdb;
+            border-radius: 20px; /* Rounded input field */
+            outline: none;
+            font-size: 15px;
+            background-color: #fafafa; /* Light background for input */
+        }
+        .chat-input button {
+            background: none;
+            border: none;
+            color: #0095f6; /* Instagram blue for Send */
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            padding: 0 10px;
+        }
+        .chat-input button:disabled {
+            color: #b2dffc; /* Lighter blue when disabled */
+            cursor: not-allowed;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 600px) {
+            .chat-container {
+                height: 100vh; /* Full height on smaller screens */
+                border-radius: 0;
+                border: none;
+            }
+        }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="chat-container">
-        <div class="chat-messages" id="chat-messages">
+        <div class="chat-header">
+            <span class="back-icon"><i class="fas fa-arrow-left"></i></span>
+            <img src="https://via.placeholder.com/36" alt="Profile" class="profile-pic">
+            <span class="username">My Chatbot</span>
+            <div class="header-icons">
+                <span><i class="fas fa-video"></i></span>
+                <span><i class="fas fa-phone-alt"></i></span>
             </div>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            <div class="message bot">Hello! I'm your Insta-inspired chatbot.</div>
+            <div class="message bot">Type something to get a reply.</div>
+        </div>
+
         <div class="chat-input">
-            <input type="text" id="message-input" placeholder="Type your message...">
-            <button id="send-button">Send</button>
+            <span class="emoji-icon"><i class="far fa-smile"></i></span>
+            <input type="text" id="message-input" placeholder="Message...">
+            <span class="gallery-icon"><i class="far fa-image"></i></span>
+            <span class="mic-icon"><i class="fas fa-microphone"></i></span>
+            <button id="send-button" disabled>Send</button>
         </div>
     </div>
 
@@ -32,24 +178,26 @@
         const sendButton = document.getElementById('send-button');
         const chatMessages = document.getElementById('chat-messages');
 
-        // Function to display a message in the chat
+        // Function to display a message in the chat UI
         function displayMessage(text, sender) {
             const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message', sender);
+            messageDiv.classList.add('message', sender); // 'user' or 'bot'
             messageDiv.textContent = text;
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
         }
 
-        // Function to send a message to the server
+        // Function to send a message to the server (your Node.js backend)
         async function sendMessage() {
             const text = messageInput.value.trim();
-            if (text === '') return;
+            if (text === '') return; // Don't send empty messages
 
-            displayMessage(text, 'user'); // Display user's message immediately
-            messageInput.value = ''; // Clear input
+            displayMessage(text, 'user'); // Display user's message instantly
+            messageInput.value = ''; // Clear the input field
+            sendButton.disabled = true; // Disable send button temporarily
 
             try {
+                // Send message to your server's API
                 const response = await fetch('/api/message', {
                     method: 'POST',
                     headers: {
@@ -59,22 +207,31 @@
                 });
 
                 const data = await response.json();
+
                 if (response.ok) {
-                    displayMessage(data.botMessage.text, 'bot'); // Display bot's reply
+                    // Display the bot's reply received from the server
+                    displayMessage(data.botMessage.text, 'bot');
                 } else {
-                    console.error('Error from server:', data.error);
-                    displayMessage('Error: Could not get a reply from the bot.', 'bot');
+                    console.error('Server error:', data.error);
+                    displayMessage('Error: Could not get a reply. Try again later.', 'bot');
                 }
             } catch (error) {
                 console.error('Network error:', error);
-                displayMessage('Error: Could not connect to the server.', 'bot');
+                displayMessage('Error: Could not connect to the server. Check your connection.', 'bot');
+            } finally {
+                sendButton.disabled = messageInput.value.trim() === ''; // Re-enable if input has text
             }
         }
 
-        // Event listeners
+        // Enable/disable send button based on input field content
+        messageInput.addEventListener('input', () => {
+            sendButton.disabled = messageInput.value.trim() === '';
+        });
+
+        // Event Listeners
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !sendButton.disabled) { // Send on Enter key if not disabled
                 sendMessage();
             }
         });
@@ -94,7 +251,7 @@
             }
         }
 
-        loadChatHistory(); // Call this on page load
+        loadChatHistory(); // Call this when the page loads
     </script>
 </body>
 </html>
