@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
@@ -40,6 +41,10 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'MySuperStrongAndVeryRandomSessionSecretKey123!@#ABCxyz',
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+        mongoUrl: process.env.MONGODB_URI || 'mongodb+srv://dontchange365:DtUiOMFzQVM0tG9l@nobifeedback.9ntuipc.mongodb.net/?retryWrites=true&w=majority&appName=nobifeedback',
+        ttl: 1000 * 60 * 60 * 24
+    }),
     cookie: { maxAge: 1000 * 60 * 60 * 24, secure: process.env.NODE_ENV === 'production' }
 }));
 
@@ -145,7 +150,7 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
                 <p>Here you can manage your website's content and users.</p>
                 <div class="nav-links">
                     <a href="/admin/list-admins">Manage Admins</a>
-                    </div>
+                </div>
                 <a href="/admin/logout" class="logout-link">Logout</a>
             </div>
         </body>
@@ -153,10 +158,9 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     `);
 });
 
-// NEW FEATURE: List all Admin Users
 app.get('/admin/list-admins', isAuthenticated, async (req, res) => {
     try {
-        const admins = await Admin.find({}, 'username'); // Fetch only username, not password
+        const admins = await Admin.find({}, 'username');
         let adminListHtml = `
             <h2>Registered Admin Users</h2>
             <table style="width:100%; border-collapse: collapse; margin-top: 20px;">
