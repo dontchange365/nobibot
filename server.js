@@ -22,7 +22,7 @@ const AdminSchema = new mongoose.Schema({
 });
 AdminSchema.pre('save', async function(next) {
     if (this.isModified('password')) {
-        const salt = await bcrypt.genGenSalt(10); // Fixed: bcrypt.genSalt -> bcrypt.genGenSalt
+        const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
     }
     next();
@@ -41,22 +41,14 @@ const ChatReplySchema = new mongoose.Schema({
     replies: [String],
     priority: { type: Number, default: 0 },
     isDefault: { type: Boolean, default: false },
-    sendMethod: { type: String, enum: ['random', 'all', 'once'], default: 'random' }
+    sendMethod: { type: String, enum: ['random', 'all', 'once'], default: 'random' } // ✅ new field
 });
 const ChatReply = mongoose.model('ChatReply', ChatReplySchema);
-
-// --- NEW CODE: Custom Variable Schema ---
-const CustomVariableSchema = new mongoose.Schema({
-    name: { type: String, required: true, unique: true }, // e.g., "random_custom_1_HEY"
-    value: { type: String, required: true }
-});
-const CustomVariable = mongoose.model('CustomVariable', CustomVariableSchema);
-// --- END NEW CODE ---
 
 app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
 app.use(bodyParser.json({ limit: '100mb' }));
 app.use(session({
-    secret: 'MySuperStrongSecretKey!', // CHANGE THIS IN PRODUCTION!
+    secret: 'MySuperStrongSecretKey!',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: MONGO_URI }),
@@ -92,7 +84,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-// CHATBOT API (modified to use handleReplySend with await)
+// CHATBOT API (no change needed here as it's an API endpoint)
 app.post('/api/chatbot/message', async (req, res) => {
     const userMessage = req.body.message;
     let botReply = "Sorry, I didn't understand that.";
@@ -103,7 +95,7 @@ app.post('/api/chatbot/message', async (req, res) => {
         try {
             const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
             if (welcomeReply) {
-                return res.json({ reply: await handleReplySend(welcomeReply) });
+                return res.json({ reply: randomReply(welcomeReply.replies) });
             }
         } catch (e) {
             console.error("Welcome message error:", e);
@@ -114,15 +106,15 @@ app.post('/api/chatbot/message', async (req, res) => {
         // 1. Exact Match
         const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
         if (exact) {
-            return res.json({ reply: await handleReplySend(exact) });
-        }
+        return res.json({ reply: handleReplySend(exact) });
+    }
 
         // 2. Pattern Matching
         const patterns = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 });
         for (const reply of patterns) {
             const keywords = reply.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
             if (keywords.some(k => userMessage.toLowerCase().includes(k))) {
-                return res.json({ reply: await handleReplySend(reply) });
+                return res.json({ reply: randomReply(reply.replies) });
             }
         }
 
@@ -131,18 +123,18 @@ app.post('/api/chatbot/message', async (req, res) => {
         for (const reply of regexMatches) {
             try {
                 if (new RegExp(reply.pattern, 'i').test(userMessage)) {
-                    return res.json({ reply: await handleReplySend(reply) });
+                    return res.json({ reply: randomReply(reply.replies) });
                 }
-            } catch (e) { /* Regex compilation error, skip */ }
+            } catch (e) { }
         }
 
         // 4. Default Fallback
         const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
-        if (fallback) return res.json({ reply: await handleReplySend(fallback) });
+        if (fallback) return res.json({ reply: randomReply(fallback.replies) });
 
     } catch (e) {
         console.error(e);
-        return res.json({ reply: "Nobi Bot error: try again later." });
+        botReply = "Nobi Bot error: try again later.";
     }
 
     res.json({ reply: botReply });
@@ -176,14 +168,14 @@ app.post('/admin/login', async (req, res) => {
     res.redirect('/admin/dashboard');
 });
 
-// ADMIN DASHBOARD (modified to include Custom Variables link)
+// ADMIN DASHBOARD
 app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     const dashboardContent = `
         <h1>Welcome Admin: ${req.session.username}</h1>
         <div class="admin-links">
             <a href="/admin/add-chat-replies">Add Chat Reply</a>
             <a href="/admin/reply-list">View Replies</a>
-            <a href="/admin/custom-variables">Manage Custom Variables</a> <a href="/admin/logout">Logout</a>
+            <a href="/admin/logout">Logout</a>
         </div>`;
     res.send(getHtmlTemplate('Admin Dashboard', dashboardContent));
 });
@@ -193,22 +185,19 @@ app.get('/admin/logout', (req, res) => {
     req.session.destroy(() => res.redirect('/admin/login'));
 });
 
-// ADD REPLY FORM (modified for variable insertion UI)
+// ADD REPLY FORM
 app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
     const addReplyForm = `
     <form method="POST" action="/admin/add-chat-replies" id="replyForm">
         <label for="ruleName">Rule Name:</label>
         <input name="ruleName" id="ruleName" placeholder="e.g. Greet User" required />
-
         <label for="sendMethod">Send Method:</label>
-        <select name="sendMethod" id="sendMethod">
-            <option value="random">Random</option>
-            <option value="all">All</option>
-            <option value="once">Once (first one)</option>
-        </select>
-
+<select name="sendMethod" id="sendMethod">
+    <option value="random">Random</option>
+    <option value="all">All</option>
+    <option value="once">Once (first one)</option>
+</select>
         <h2>Add Chat Reply</h2>
-
         <label for="type">Type:</label>
         <select name="type" id="type" required onchange="handleTypeChange()">
             <option value="">--Select Type--</option>
@@ -244,52 +233,33 @@ app.get('/admin/add-chat-replies', isAuthenticated, (req, res) => {
         </div>
 
         <button type="submit">Add Reply</button>
-
-        <h3>🧩 Available Variables:</h3>
-        <div id="variableList" style="font-family: monospace; white-space: pre-wrap;"></div>
     </form>
 
     <script>
     function handleTypeChange() {
         const type = document.getElementById('type').value;
-        document.getElementById('keywordField').style.display = (type === 'exact_match' || type === 'pattern_matching') ? 'block' : 'none';
-        document.getElementById('patternField').style.display = (type === 'expert_pattern_matching') ? 'block' : 'none';
-        document.getElementById('isDefaultField').style.display = (type === 'default_message') ? 'block' : 'none';
+        const keywordField = document.getElementById('keywordField');
+        const patternField = document.getElementById('patternField');
+        const isDefaultField = document.getElementById('isDefaultField');
+
+        keywordField.style.display = 'none';
+        patternField.style.display = 'none';
+        isDefaultField.style.display = 'none';
+
+        if (type === 'exact_match' || type === 'pattern_matching') {
+            keywordField.style.display = 'block';
+        }
+
+        if (type === 'expert_pattern_matching') {
+            patternField.style.display = 'block';
+        }
+
+        if (type === 'default_message') {
+            isDefaultField.style.display = 'block';
+        }
     }
-
-    const defaultVariables = [
-      { name: "%DAYOFMONTH%", type: "Default", value: "01" },
-      { name: "%MONTH%", type: "Default", value: "June" },
-      { name: "%YEAR%", type: "Default", value: "2025" },
-      { name: "%HOUR%", type: "Default", value: "12" },
-      { name: "%MINUTE%", type: "Default", value: "00" },
-      { name: "%SECOND%", type: "Default", value: "00" },
-      { name: "%DAYNAME%", type: "Default", value: "Sunday" },
-      { name: "%TIMESTAMP%", type: "Default", value: "June 2, 2025, 12:00 PM" }
-    ];
-
-    function displayVariables(vars) {
-      const list = vars.map(v => \`\${v.name.padEnd(25)} | \${v.type} | \${v.value}\`).join('\\n');
-      document.getElementById('variableList').textContent = list;
-    }
-
-    let allVariables = [...defaultVariables];
-
-    fetch('/api/custom-variables')
-      .then(res => res.json())
-      .then(customVars => {
-        customVars.forEach(v => {
-          allVariables.push({ name: \`%\${v.name}%\`, type: 'Custom', value: v.value });
-        });
-        displayVariables(allVariables);
-      })
-      .catch(err => {
-        console.error('Error loading variables:', err);
-        document.getElementById('variableList').innerHTML = '<p>Failed to load variables.</p>';
-      });
     </script>
     `;
-
     res.send(getHtmlTemplate('Add Chat Reply', addReplyForm));
 });
 
@@ -416,13 +386,13 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
 
         // Drag start
         list.addEventListener('dragstart', (e) => {
-            if (!e.target.classList.contains('drag-handle')) {
-                e.preventDefault(); // prevent drag unless it's on icon
-                return;
-            }
-            dragged = e.target.closest('li.reply-item');
-            dragged.style.opacity = 0.5;
-        });
+    if (!e.target.classList.contains('drag-handle')) {
+        e.preventDefault(); // prevent drag unless it's on icon
+        return;
+    }
+    dragged = e.target.closest('li.reply-item');
+    dragged.style.opacity = 0.5;
+});
         // Drag over
         list.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -469,7 +439,7 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     res.send(getHtmlTemplate('Chat Reply List', content));
 });
 
-// EDIT REPLY (modified for variable insertion UI)
+// EDIT REPLY
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     const r = await ChatReply.findById(req.params.id);
     if (!r) {
@@ -501,7 +471,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
 
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>
-        <button type="button" id="insertVariableBtn" style="margin-top: 5px; padding: 8px 12px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Insert Variable</button>
+
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="${r.priority}" />
 
@@ -516,16 +486,6 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         <button type="submit">Update Reply</button>
     </form>
 
-    <div id="variableModal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color: rgba(0,0,0,0.4);">
-        <div style="background-color:#fefefe; margin: 10% auto; padding:20px; border:1px solid #888; width:80%; max-width:600px; border-radius: 8px; position: relative;">
-            <span id="closeModalBtn" style="color:#aaa; float:right; font-size:28px; font-weight:bold; cursor:pointer;">&times;</span>
-            <h3>Select Variable to Insert</h3>
-            <input type="text" id="variableSearch" placeholder="Search variables..." style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #ddd; border-radius:4px;">
-            <div id="variableList" style="max-height:300px; overflow-y:auto; border:1px solid #eee; padding:5px; border-radius:4px;">
-                </div>
-            <button type="button" onclick="document.getElementById('variableModal').style.display='none'" style="margin-top:15px; padding:8px 15px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
-        </div>
-    </div>
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const type = "${r.type}";
@@ -542,147 +502,6 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         if (type === 'default_message') {
             isDefaultField.style.display = 'block';
         }
-
-        // --- NEW JAVASCRIPT FOR VARIABLE MODAL (Copied from Add Reply Form) ---
-        const insertVariableBtn = document.getElementById('insertVariableBtn');
-        const variableModal = document.getElementById('variableModal');
-        const closeModalBtn = document.getElementById('closeModalBtn');
-        const variableList = document.getElementById('variableList');
-        const variableSearch = document.getElementById('variableSearch');
-        const repliesTextarea = document.getElementById('replies');
-
-        let allVariables = [];
-
-        const defaultVariables = [
-            // Date/Time
-            { name: '%DAYOFMONTH%', type: 'Date/Time' },
-            { name: '%DAYOFMONTH_SHORT%', type: 'Date/Time' },
-            { name: '%MONTH%', type: 'Date/Time' },
-            { name: '%MONTH_SHORT%', type: 'Date/Time' },
-            { name: '%YEAR%', type: 'Date/Time' },
-            { name: '%YEAR_SHORT%', type: 'Date/Time' },
-            { name: '%DAYNAME%', type: 'Date/Time' },
-            { name: '%DAYNAME_SHORT%', type: 'Date/Time' },
-            { name: '%HOUR%', type: 'Date/Time' }, // 24-hour format
-            { name: '%MINUTE%', type: 'Date/Time' },
-            { name: '%SECOND%', type: 'Date/Time' },
-            { name: '%TIMESTAMP%', type: 'Date/Time' },
-            { name: '%HOUR12%', type: 'Date/Time' },
-            { name: '%HOUR12_WITH_AMPM%', type: 'Date/Time' },
-            { name: '%HOUR24%', type: 'Date/Time' },
-            { name: '%AMPM%', type: 'Date/Time' },
-            { name: '%DAYOFYEAR%', type: 'Date/Time' },
-            { name: '%WEEKOFYEAR%', type: 'Date/Time' },
-            // Random Generators
-            { name: '%RANDOM_ASCII_SYMBOL_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_A-Z_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_A-Z_0-9_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_a-z_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_a-z_0-9_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_a-z_A-Z_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_a-z_A-Z_0-9_<LENGTH>%', type: 'Random' },
-            { name: '%RANDOM_CUSTOM_<LENGTH>_<OPT1,OPT2,...>%', type: 'Random' },
-            { name: '%RANDOM_NUMBER_<MIN>-<MAX>%', type: 'Random' },
-            // Placeholder for advanced variables (will need backend integration later)
-            { name: '%RECEIVED_MESSAGE_<MAXLENGTH>%', type: 'Advanced (Placeholder)' },
-            { name: '%PREVIOUS_MESSAGE_<RULEID1,RULEID2,...>_<OFFSET>%', type: 'Advanced (Placeholder)' },
-            { name: '%REPLY_COUNT_OVERALL%', type: 'Advanced (Placeholder)' },
-            { name: '%RULE_ID%', type: 'Advanced (Placeholder)' },
-            { name: '%NAME%', type: 'Advanced (Placeholder)' }, // User's name
-            { name: '%CAPTURING_GROUP_<ID>%', type: 'Advanced (Placeholder)' }, // For Regex captures
-        ];
-
-        async function loadVariables() {
-            try {
-                const response = await fetch('/api/custom-variables');
-                const customVars = await response.json();
-                allVariables = [
-                    ...defaultVariables,
-                    ...customVars.map(v => ({ name: `%${v.name}%`, type: 'Custom', value: v.value }))
-                ];
-                displayVariables(allVariables);
-            } catch (error) {
-                console.error('Error loading variables:', error);
-                variableList.innerHTML = '<p>Error loading variables. Please try again.</p>';
-            }
-        }
-
-        function displayVariables(variablesToDisplay) {
-            variableList.innerHTML = '';
-            if (variablesToDisplay.length === 0) {
-                variableList.innerHTML = '<p>No variables found.</p>';
-                return;
-            }
-
-            const groupedVariables = variablesToDisplay.reduce((acc, varObj) => {
-                (acc[varObj.type] = acc[varObj.type] || []).push(varObj);
-                return acc;
-            }, {});
-
-            const sortedTypes = ['Date/Time', 'Random', 'Custom', 'Advanced (Placeholder)'].filter(type => groupedVariables[type]);
-
-            sortedTypes.forEach(type => {
-                const typeHeader = document.createElement('h4');
-                typeHeader.textContent = type;
-                typeHeader.style.marginTop = '10px';
-                typeHeader.style.marginBottom = '5px';
-                typeHeader.style.color = '#333';
-                variableList.appendChild(typeHeader);
-
-                groupedVariables[type].forEach(varObj => {
-                    const varItem = document.createElement('div');
-                    varItem.className = 'variable-item';
-                    varItem.style.padding = '8px';
-                    varItem.style.borderBottom = '1px solid #eee';
-                    varItem.style.cursor = 'pointer';
-                    varItem.style.backgroundColor = '#f9f9f9';
-                    varItem.style.marginBottom = '2px';
-                    varItem.style.borderRadius = '3px';
-                    varItem.style.transition = 'background-color 0.2s';
-                    varItem.onmouseover = () => varItem.style.backgroundColor = '#e6e6e6';
-                    varItem.onmouseout = () => varItem.style.backgroundColor = '#f9f9f9';
-
-                    varItem.innerHTML = `<strong>${varObj.name}</strong> ${varObj.type === 'Custom' ? `<small>(Value: ${varObj.value.slice(0, 50)}${varObj.value.length > 50 ? '...' : ''})</small>` : ''}`;
-
-                    varItem.onclick = () => {
-                        const cursorPos = repliesTextarea.selectionStart;
-                        const textBefore = repliesTextarea.value.substring(0, cursorPos);
-                        const textAfter = repliesTextarea.value.substring(cursorPos, repliesTextarea.value.length);
-                        repliesTextarea.value = textBefore + varObj.name + textAfter;
-                        repliesTextarea.selectionStart = repliesTextarea.selectionEnd = cursorPos + varObj.name.length;
-                        variableModal.style.display = 'none';
-                        repliesTextarea.focus();
-                    };
-                    variableList.appendChild(varItem);
-                });
-            });
-        }
-
-        insertVariableBtn.addEventListener('click', () => {
-            loadVariables();
-            variableModal.style.display = 'block';
-            variableSearch.value = '';
-            variableSearch.focus();
-        });
-
-        closeModalBtn.addEventListener('click', () => {
-            variableModal.style.display = 'none';
-        });
-
-        window.addEventListener('click', (event) => {
-            if (event.target == variableModal) {
-                variableModal.style.display = 'none';
-            }
-        });
-
-        variableSearch.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            const filteredVariables = allVariables.filter(varObj =>
-                varObj.name.toLowerCase().includes(searchTerm) ||
-                (varObj.type === 'Custom' && varObj.value.toLowerCase().includes(searchTerm))
-            );
-            displayVariables(filteredVariables);
-        });
     });
     </script>
 
@@ -710,360 +529,18 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     res.redirect('/admin/reply-list');
 });
 
-// --- NEW CODE: Custom Variable Management Routes ---
-// LIST CUSTOM VARIABLES
-app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
-    const customVariables = await CustomVariable.find().sort({ name: 1 });
-
-    const listItems = customVariables.map(v => `
-        <li>
-            <strong>%${v.name}%</strong>: ${v.value.slice(0, 100)}${v.value.length > 100 ? '...' : ''}
-            <a href="/admin/edit-custom-variable/${v._id}">✏️ Edit</a>
-            <a href="/admin/delete-custom-variable/${v._id}" onclick="return confirm('Delete this custom variable?')">🗑️ Delete</a>
-        </li>
-    `).join('');
-
-    const content = `
-    <h2>Custom Variables</h2>
-    <a href="/admin/add-custom-variable" class="button">Add New Custom Variable</a>
-    <ul class="custom-var-list">${listItems}</ul>
-    <a href="/admin/dashboard">← Back to Dashboard</a>
-
-    <style>
-        .custom-var-list {
-            list-style: none;
-            padding: 0;
-            margin-top: 20px;
-        }
-        .custom-var-list li {
-            background: #f9f9f9;
-            border: 1px solid #ddd;
-            padding: 10px 15px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .custom-var-list li strong {
-            color: #0056b3;
-            margin-right: 10px;
-        }
-        .custom-var-list li a {
-            margin-left: 10px;
-        }
-        .button {
-            display: inline-block;
-            background-color: #007bff;
-            color: white;
-            padding: 10px 15px;
-            border-radius: 5px;
-            text-decoration: none;
-            margin-bottom: 15px;
-        }
-        .button:hover {
-            background-color: #0056b3;
-        }
-    </style>
-    `;
-    res.send(getHtmlTemplate('Custom Variables', content));
-});
-
-// ADD CUSTOM VARIABLE FORM
-app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
-    const addCustomVarForm = `
-    <form method="POST" action="/admin/add-custom-variable">
-        <h2>Add Custom Variable</h2>
-        <label for="name">Variable Name (e.g., random_custom_1_HEY):</label>
-        <input name="name" id="name" placeholder="random_custom_1_BOTNAME" required pattern="random_custom_[0-9]+_[A-Z0-9_]+" title="Format: random_custom_ID_NAME (e.g., random_custom_1_HEY)" />
-        <label for="value">Variable Value:</label>
-        <textarea name="value" id="value" placeholder="e.g., Hello there! or Today is %dayname%" required></textarea>
-        <button type="submit">Add Custom Variable</button>
-    </form>
-    <br>
-    <a href="/admin/custom-variables">← Back to Custom Variables List</a>
-    `;
-    res.send(getHtmlTemplate('Add Custom Variable', addCustomVarForm));
-});
-
-app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
-    const { name, value } = req.body;
-    try {
-        const newCustomVar = new CustomVariable({ name, value });
-        await newCustomVar.save();
-        res.redirect('/admin/custom-variables');
-    } catch (e) {
-        console.error("Error adding custom variable:", e);
-        res.send(getHtmlTemplate('Error', `<p>Error adding variable. Name might be duplicated or format is wrong. <a href="/admin/add-custom-variable">Try again</a></p>`));
-    }
-});
-
-// EDIT CUSTOM VARIABLE
-app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
-    const customVar = await CustomVariable.findById(req.params.id);
-    if (!customVar) {
-        return res.send(getHtmlTemplate('Error', '<p>Custom variable not found.</p><br><a href="/admin/custom-variables">Back to Custom Variables List</a>'));
-    }
-    const editCustomVarForm = `
-    <form method="POST" action="/admin/edit-custom-variable/${customVar._id}">
-        <h2>Edit Custom Variable</h2>
-        <label for="name">Variable Name (e.g., random_custom_1_HEY):</label>
-        <input name="name" id="name" value="${customVar.name}" readonly />
-        <label for="value">Variable Value:</label>
-        <textarea name="value" id="value" required>${customVar.value}</textarea>
-        <button type="submit">Update Custom Variable</button>
-    </form>
-    <br>
-    <a href="/admin/custom-variables">← Back to Custom Variables List</a>
-    `;
-    res.send(getHtmlTemplate('Edit Custom Variable', editCustomVarForm));
-});
-
-app.post('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
-    const { value } = req.body;
-    try {
-        await CustomVariable.findByIdAndUpdate(req.params.id, { value });
-        res.redirect('/admin/custom-variables');
-    } catch (e) {
-        console.error("Error updating custom variable:", e);
-        res.send(getHtmlTemplate('Error', `<p>Error updating variable. <a href="/admin/edit-custom-variable/${req.params.id}">Try again</a></p>`));
-    }
-});
-
-// DELETE CUSTOM VARIABLE
-app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) => {
-    await CustomVariable.findByIdAndDelete(req.params.id);
-    res.redirect('/admin/custom-variables');
-});
-// --- END NEW CODE: Custom Variable Management Routes ---
-
-// --- NEW API ENDPOINT TO FETCH CUSTOM VARIABLES FOR JS MODAL ---
-app.get('/api/custom-variables', isAuthenticated, async (req, res) => {
-    try {
-        const customVariables = await CustomVariable.find({}, 'name value'); // Only fetch name and value
-        res.json(customVariables);
-    } catch (error) {
-        console.error('Error fetching custom variables:', error);
-        res.status(500).json({ message: 'Error fetching custom variables' });
-    }
-});
-// --- END NEW API ENDPOINT ---
-
-
-// --- NEW CODE: Variable Replacement Function ---
-async function applyVariableReplacements(text) {
-    const customVars = await CustomVariable.find({});
-    const customVarMap = new Map();
-    customVars.forEach(v => customVarMap.set(v.name.toUpperCase(), v.value));
-
-    let replacedText = text;
-    let maxIterations = 5; // Limit nested replacements
-    let iterationCount = 0;
-
-    while (iterationCount < maxIterations) {
-        let changesMade = false;
-
-        const now = new Date();
-        const defaultReplacements = {
-            '%DAYOFMONTH%': now.getDate().toString().padStart(2, '0'),
-            '%MONTH%': now.toLocaleString('en-US', { month: 'long' }),
-            '%YEAR%': now.getFullYear().toString(),
-            '%HOUR%': now.getHours().toString().padStart(2, '0'), // 24-hour format
-            '%MINUTE%': now.getMinutes().toString().padStart(2, '0'),
-            '%SECOND%': now.getSeconds().toString().padStart(2, '0'),
-            '%DAYNAME%': now.toLocaleString('en-US', { weekday: 'long' }),
-            '%TIMESTAMP%': now.toLocaleString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: 'numeric',
-                hour12: true
-            }),
-            // --- NEW DATE/TIME VARS ---
-            '%DAYOFMONTH_SHORT%': now.getDate().toString(), // No leading zero
-            '%MONTH_SHORT%': now.toLocaleString('en-US', { month: 'short' }),
-            '%DAYNAME_SHORT%': now.toLocaleString('en-US', { weekday: 'short' }),
-            '%YEAR_SHORT%': now.getFullYear().toString().slice(-2), // Last two digits of year
-            '%HOUR12%': now.toLocaleString('en-US', { hour: 'numeric', hour12: true }).replace(/ AM| PM/, ''), // 12-hour without AM/PM
-            '%HOUR12_WITH_AMPM%': now.toLocaleString('en-US', { hour: 'numeric', hour12: true }), // 12-hour with AM/PM
-            '%HOUR24%': now.getHours().toString().padStart(2, '0'), // Same as %HOUR%
-            '%AMPM%': now.toLocaleString('en-US', { hour: 'numeric', hour12: true }).slice(-2).trim(), // AM or PM
-            '%DAYOFYEAR%': Math.ceil((now - new Date(now.getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24)).toString(),
-            '%WEEKOFYEAR%': Math.ceil((now - new Date(now.getFullYear(), 0, 1) + new Date(now.getFullYear(), 0, 1).getDay() * 86400000) / (7 * 86400000)).toString(),
-            // --- END NEW DATE/TIME VARS ---
-        };
-
-        for (const [key, value] of Object.entries(defaultReplacements)) {
-            const regex = new RegExp(key.replace(/%/g, '\\%'), 'gi');
-            if (replacedText.match(regex)) {
-                replacedText = replacedText.replace(regex, value);
-                changesMade = true;
-            }
-        }
-
-        // --- NEW RANDOM VARS ---
-        // %RANDOM_ASCII_SYMBOL_<LENGTH>%
-        replacedText = replacedText.replace(/%RANDOM_ASCII_SYMBOL_(\d+)%/gi, (match, lengthStr) => {
-            const length = parseInt(lengthStr);
-            if (isNaN(length) || length <= 0) return match;
-            let result = '';
-            const characters = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
-            for (let i = 0; i < length; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
-            }
-            changesMade = true;
-            return result;
-        });
-
-        // %RANDOM_A-Z_<LENGTH>%
-        replacedText = replacedText.replace(/%RANDOM_A-Z_(\d+)%/gi, (match, lengthStr) => {
-            const length = parseInt(lengthStr);
-            if (isNaN(length) || length <= 0) return match;
-            let result = '';
-            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            for (let i = 0; i < length; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
-            }
-            changesMade = true;
-            return result;
-        });
-
-        // %RANDOM_A-Z_0-9_<LENGTH>%
-        replacedText = replacedText.replace(/%RANDOM_A-Z_0-9_(\d+)%/gi, (match, lengthStr) => {
-            const length = parseInt(lengthStr);
-            if (isNaN(length) || length <= 0) return match;
-            let result = '';
-            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            for (let i = 0; i < length; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
-            }
-            changesMade = true;
-            return result;
-        });
-
-        // %RANDOM_a-z_<LENGTH>%
-        replacedText = replacedText.replace(/%RANDOM_a-z_(\d+)%/gi, (match, lengthStr) => {
-            const length = parseInt(lengthStr);
-            if (isNaN(length) || length <= 0) return match;
-            let result = '';
-            const characters = 'abcdefghijklmnopqrstuvwxyz';
-            for (let i = 0; i < length; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
-            }
-            changesMade = true;
-            return result;
-        });
-
-        // %RANDOM_a-z_0-9_<LENGTH>%
-        replacedText = replacedText.replace(/%RANDOM_a-z_0-9_(\d+)%/gi, (match, lengthStr) => {
-            const length = parseInt(lengthStr);
-            if (isNaN(length) || length <= 0) return match;
-            let result = '';
-            const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
-            for (let i = 0; i < length; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
-            }
-            changesMade = true;
-            return result;
-        });
-
-        // %RANDOM_a-z_A-Z_<LENGTH>%
-        replacedText = replacedText.replace(/%RANDOM_a-z_A-Z_(\d+)%/gi, (match, lengthStr) => {
-            const length = parseInt(lengthStr);
-            if (isNaN(length) || length <= 0) return match;
-            let result = '';
-            const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            for (let i = 0; i < length; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
-            }
-            changesMade = true;
-            return result;
-        });
-
-        // %RANDOM_a-z_A-Z_0-9_<LENGTH>%
-        replacedText = replacedText.replace(/%RANDOM_a-z_A-Z_0-9_(\d+)%/gi, (match, lengthStr) => {
-            const length = parseInt(lengthStr);
-            if (isNaN(length) || length <= 0) return match;
-            let result = '';
-            const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            for (let i = 0; i < length; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
-            }
-            changesMade = true;
-            return result;
-        });
-
-
-        // %RANDOM_CUSTOM_<LENGTH>_<OPT1,OPT2,OPT3>% (e.g., %RANDOM_CUSTOM_3_APPLE,BANANA,CHERRY%)
-        replacedText = replacedText.replace(/%RANDOM_CUSTOM_(\d+)_([^%]+)%/gi, (match, lengthStr, optionsStr) => {
-            const length = parseInt(lengthStr);
-            if (isNaN(length) || length <= 0) return match;
-
-            const options = optionsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
-            if (options.length === 0) return match;
-
-            let result = '';
-            for (let i = 0; i < length; i++) {
-                result += options[Math.floor(Math.random() * options.length)];
-            }
-            changesMade = true;
-            return result;
-        });
-
-        // %RANDOM_NUMBER_<A>-<B>% (e.g., %RANDOM_NUMBER_1-100%)
-        replacedText = replacedText.replace(/%RANDOM_NUMBER_(\d+)-(\d+)%/gi, (match, minStr, maxStr) => {
-            const min = parseInt(minStr);
-            const max = parseInt(maxStr);
-            if (isNaN(min) || isNaN(max) || min > max) return match;
-            changesMade = true;
-            return (Math.floor(Math.random() * (max - min + 1)) + min).toString();
-        });
-        // --- END NEW RANDOM VARS ---
-
-
-        // Custom Variable Replacements
-        for (const [name, value] of customVarMap.entries()) {
-            const varPlaceholder = `%${name}%`;
-            if (replacedText.includes(varPlaceholder)) {
-                replacedText = replacedText.replace(new RegExp(varPlaceholder.replace(/%/g, '\\%'), 'gi'), value);
-                changesMade = true;
-            }
-        }
-
-        if (!changesMade) {
-            break;
-        }
-        iterationCount++;
-    }
-
-    return replacedText;
-}
-// --- END NEW CODE ---
-
-// handleReplySend (modified to use applyVariableReplacements)
-async function handleReplySend(replyObj) { // MODIFIED to be async
+function handleReplySend(replyObj) {
     if (!replyObj || !replyObj.replies || replyObj.replies.length === 0) return "No reply found";
-
-    let finalReply = "";
 
     switch (replyObj.sendMethod) {
         case 'once':
-            finalReply = replyObj.replies[0];
-            break;
+            return replyObj.replies[0]; // First one always
         case 'all':
-            finalReply = replyObj.replies.join('\n');
-            break;
+            return replyObj.replies.join('\n'); // All line by line
         case 'random':
         default:
-            finalReply = randomReply(replyObj.replies);
-            break;
+            return randomReply(replyObj.replies); // Random default
     }
-
-    // Apply variable replacements to the final reply string
-    finalReply = await applyVariableReplacements(finalReply); // NEW LINE: Apply replacements
-
-    return finalReply;
 }
 
 // DELETE
