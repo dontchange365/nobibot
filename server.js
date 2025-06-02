@@ -88,32 +88,28 @@ function getHtmlTemplate(title, bodyContent) {
 }
 const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-// ===== Recursive Replace Function =====
-// This function recursively replaces variables within a given text.
-// It iterates up to maxDepth to prevent infinite loops in case of circular references.
+// ======= NESTED VARIABLE RESOLVER =========
 async function resolveVariables(text, customVariables, maxDepth = 8) {
     let result = text;
     let depth = 0;
-    // Create a map for quick lookup of variable values
+    // Map for fast lookup
     const varMap = {};
     customVariables.forEach(v => { varMap[v.name] = v.value; });
 
-    let matched;
-    // Loop until no more variables are matched or maxDepth is reached
-    do {
-        matched = false;
-        // Regex to find %VARIABLE_NAME% patterns
+    // Yeh loop karta rahega jab tak variable milte rahenge ya maxDepth nahi ho jata
+    while (depth < maxDepth) {
+        // Pehle ka result save karo
+        const prev = result;
         result = result.replace(/%([a-zA-Z0-9_]+)%/g, (match, vname) => {
-            // If the variable name exists in our map, replace it
             if (varMap[vname] !== undefined) {
-                matched = true; // Mark that a replacement occurred
                 return varMap[vname];
             }
-            // If not found, return the original match (e.g., %rule_id%)
             return match;
         });
+        // Agar result change hi nahi hua to break
+        if (result === prev) break;
         depth++;
-    } while (matched && depth < maxDepth); // Continue if replacements happened and depth limit not reached
+    }
     return result;
 }
 
