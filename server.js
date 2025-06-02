@@ -378,8 +378,9 @@ app.get('/admin/logout', (req, res) => {
 // ADD REPLY FORM
 app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     let customVarList = '';
+    let customVariables = [];
     try {
-        const customVariables = await CustomVariable.find({});
+        customVariables = await CustomVariable.find({});
         customVarList = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
         if (customVarList) {
             customVarList = `<br>**Custom Variables:** ${customVarList}`;
@@ -490,9 +491,11 @@ function insertVariable(variable) {
     }
     </script>
     `;
-     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Chat Reply', addReplyForm));
+     res.set({
+      'Content-Type': 'text/html',
+      'Content-Disposition': 'inline'
+    }).send(getHtmlTemplate('Add Chat Reply', addReplyForm));
 });
-
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>'));
@@ -946,7 +949,10 @@ app.get('/admin/add-variable', isAuthenticated, async (req, res) => {
         <br>
         <a href="/admin/custom-variables">← Back to Custom Variables</a>
         `;
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Variable', addVariableForm));
+        res.set({
+            'Content-Type': 'text/html',
+            'Content-Disposition': 'inline'
+        }).send(getHtmlTemplate('Add Variable', addVariableForm));
     } catch (error) {
         console.error("Add Variable Load Error:", error);
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading form</p><a href="/admin/dashboard">Back</a>'));
