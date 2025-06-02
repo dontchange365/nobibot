@@ -69,7 +69,282 @@ function isAuthenticated(req, res, next) {
     if (req.session.loggedIn) return next();
     return res.redirect('/admin/login');
 }
-function getHtmlTemplate(title, bodyContent) {
+function getHtmlTemplate(title, bodyContent, includeFormStyles = false) {
+    let styles = '';
+    if (includeFormStyles) {
+        styles = `
+        <style>
+            body {
+                background: linear-gradient(120deg, #eceafd 70%, #e2d4f5 100%);
+                font-family: 'Inter', sans-serif; /* You might need to link this font */
+                margin: 0;
+                padding: 0;
+            }
+
+            .form-card {
+                max-width: 390px;
+                width: 95vw;
+                margin: 30px auto;
+                background: #fff;
+                border-radius: 22px;
+                box-shadow: 0 8px 30px #a37be755;
+                padding: 32px 20px 26px 20px;
+                position: relative;
+                animation: popin 0.7s cubic-bezier(.18,1.13,.4,1.06);
+                box-sizing: border-box; /* Important for responsive padding */
+            }
+
+            @keyframes popin {
+                from { opacity: 0; transform: translateY(45px) scale(0.98);}
+                to   { opacity: 1; transform: none;}
+            }
+
+            .form-card h2 {
+                font-size: 2.1rem;
+                color: #8227b3;
+                font-weight: 800;
+                letter-spacing: 1.5px;
+                margin-bottom: 18px;
+                text-shadow: 0 2px 14px #e3d2ff7c;
+                text-align: center;
+            }
+
+            .form-card label {
+                display: block;
+                color: #6a3cc9;
+                font-weight: 600;
+                font-size: 1.06rem;
+                margin-bottom: 4px;
+                margin-top: 15px; /* Spacing between fields */
+            }
+            .form-card label:first-of-type { margin-top: 0; }
+
+
+            .form-card input[type="text"],
+            .form-card input[type="number"],
+            .form-card select,
+            .form-card textarea {
+                width: 100%;
+                border-radius: 10px;
+                border: 1.7px solid #e5dbfa;
+                background: #faf6ff;
+                color: #271446;
+                font-size: 1rem;
+                padding: 11px 14px;
+                transition: border 0.17s, box-shadow 0.18s, background 0.1s;
+                box-sizing: border-box; /* Include padding in width */
+            }
+
+            .form-card input[type="text"]:focus,
+            .form-card input[type="number"]:focus,
+            .form-card select:focus,
+            .form-card textarea:focus {
+                border: 1.7px solid #a671f3;
+                box-shadow: 0 0 0 2.5px #e7dbffcc;
+                background: #f5efff;
+                outline: none;
+            }
+
+            .form-card select {
+                appearance: none;
+                -webkit-appearance: none;
+                background: #f3eaff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%237d38a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 12px center;
+                background-size: 18px;
+            }
+            .form-card .select-wrapper {
+                position: relative;
+            }
+            /* .select-wrapper::after { /* This is not needed if using SVG background in select */
+            /* content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%237d38a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); */
+            /* position: absolute; */
+            /* right: 12px; */
+            /* top: 50%; */
+            /* transform: translateY(-50%); */
+            /* pointer-events: none; */
+            /* height: 18px; width: 18px; */
+            /* } */
+
+            .form-card textarea {
+                min-height: 60px;
+                resize: vertical;
+            }
+
+            .reply-area {
+                display: flex;
+                align-items: flex-start; /* Align button to top of textarea */
+                gap: 6px;
+                position: relative;
+                margin-bottom: 17px;
+            }
+            .reply-area textarea {
+                flex: 1;
+                margin-bottom: 0; /* Remove default margin from textarea */
+                padding-right: 44px; /* Make space for the button inside textarea */
+            }
+            .reply-icon-btn {
+                position: absolute;
+                top: 5px; /* Adjust as needed */
+                right: 5px; /* Adjust as needed */
+                padding: 0;
+                height: 28px; width: 28px;
+                border-radius: 8px;
+                border: none;
+                background: rgba(155,105,255,0.09);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 8px #a97cfa24;
+                backdrop-filter: blur(3px);
+                transition: background 0.17s, transform 0.12s, box-shadow 0.17s;
+            }
+            .reply-icon-btn:hover {
+                background: linear-gradient(92deg, #e2d6ff 30%, #cba9f9 100%);
+                transform: scale(1.07);
+                box-shadow: 0 4px 12px #a97cfa33;
+            }
+            .reply-icon-btn:active {
+                transform: scale(0.95);
+                box-shadow: 0 1px 4px #a97cfa24;
+            }
+            .reply-icon-btn svg {
+                stroke: #7d38a8;
+                fill: none;
+            }
+
+            .btn-main {
+                width: 100%;
+                background: linear-gradient(90deg, #7e4af5 40%, #bf51e8 100%);
+                color: #fff;
+                font-weight: 700;
+                font-size: 1.15rem;
+                border-radius: 13px;
+                border: none;
+                padding: 13px 0;
+                margin-top: 15px;
+                box-shadow: 0 5px 16px #c79fff44;
+                transition: box-shadow 0.17s, background 0.19s, transform 0.12s;
+                cursor: pointer;
+            }
+            .btn-main:hover {
+                background: linear-gradient(90deg, #6124d4 40%, #8227b3 100%);
+                box-shadow: 0 9px 28px #b48ffa55;
+                transform: translateY(-2px);
+            }
+            .btn-main:active {
+                transform: scale(0.98);
+                box-shadow: 0 3px 7px #b48ffa55;
+            }
+
+            .back-btn {
+                position: absolute;
+                top: 19px;
+                left: 19px;
+                background: rgba(155,105,255,0.13);
+                color: #7427bf;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 7px;
+                font-weight: 700;
+                font-size: 1rem;
+                display: flex;
+                align-items: center;
+                gap: 7px;
+                box-shadow: 0 1.5px 9px #cbb0ef35;
+                transition: background .14s, color .14s, transform .12s, box-shadow .14s;
+                text-decoration: none; /* Remove underline for anchor tag */
+                cursor: pointer;
+                z-index: 10; /* Ensure it's above other elements */
+            }
+            .back-btn:hover {
+                background: #e8dfff;
+                color: #502283;
+                box-shadow: 0 2px 12px #cbb0ef55;
+            }
+            .back-btn:active {
+                background: #e0ccff;
+                color: #412276;
+                transform: scale(.98);
+                box-shadow: 0 1px 5px #cbb0ef35;
+            }
+            .back-btn svg {
+                stroke: #7427bf; /* Default color for arrow */
+                transition: stroke .14s;
+            }
+            .back-btn:hover svg {
+                stroke: #502283; /* Hover color for arrow */
+            }
+            .back-btn:active svg {
+                 stroke: #412276; /* Active color for arrow */
+            }
+
+
+            /* Variable Popup Styling */
+            #varPopup {
+                transition: opacity 0.2s ease-in-out;
+            }
+            #varPopup.fade-in {
+                opacity: 1;
+            }
+            #varPopup.fade-out {
+                opacity: 0;
+            }
+            #varPopup > div { /* Inner popup card */
+                box-shadow: 0 4px 28px #55318c44;
+            }
+            #varPopup .var-list li {
+                transition: background 0.1s;
+            }
+
+            /* Responsive Adjustments */
+            @media (max-width: 500px) {
+                .form-card {
+                    margin: 20px auto;
+                    padding: 25px 15px 20px 15px; /* Smaller padding on small screens */
+                }
+                .form-card h2 {
+                    font-size: 1.8rem;
+                }
+                .form-card label {
+                    font-size: 1rem;
+                }
+                .form-card input, .form-card select, .form-card textarea {
+                    font-size: 0.95rem;
+                    padding: 9px 12px;
+                }
+                .btn-main {
+                    font-size: 1.05rem;
+                    padding: 11px 0;
+                }
+                .back-btn {
+                    font-size: 0.9rem;
+                    padding: 7px 14px;
+                    top: 15px;
+                    left: 15px;
+                }
+                .reply-icon-btn {
+                    height: 26px; width: 26px;
+                    top: 4px; right: 4px;
+                }
+                #varPopup > div {
+                    padding: 20px 18px;
+                }
+                #varPopup #varSearch {
+                    font-size: 14px;
+                    padding: 5px 10px;
+                }
+                #varPopup .var-list li {
+                    font-size: 14px;
+                    padding: 6px 10px;
+                }
+                #varPopup #varCloseBtn {
+                    font-size: 14px;
+                    padding: 6px 14px;
+                }
+            }
+        </style>
+        `;
+    }
     return `
     <!DOCTYPE html>
     <html lang="en">
@@ -77,7 +352,9 @@ function getHtmlTemplate(title, bodyContent) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${title}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
         <link rel="stylesheet" href="/style.css">
+        ${styles}
     </head>
     <body>
         ${bodyContent}
@@ -328,85 +605,88 @@ app.get('/admin/logout', (req, res) => {
 
 // -- Add Chat Reply Form
 app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
-    // let customVarListHtml = ''; // No longer needed as the small block is removed
     let customVarsJsArray = '[]';
     try {
         const customVariables = await CustomVariable.find({});
-        // customVarListHtml = customVariables.map(v => `<code>%${v.name}%</code>`).join(', '); // No longer needed
-        // if (customVarListHtml) {
-        //     customVarListHtml = `<br>**Custom Variables:** ${customVarListHtml}`; // No longer needed
-        // }
-        // Prepare JS array for client-side
         customVarsJsArray = JSON.stringify(customVariables.map(v => `%${v.name}%`));
     } catch (e) {
         console.error("Error fetching custom variables for form:", e);
     }
 
     const addReplyForm = `
-    <form method="POST" action="/admin/add-chat-replies">
-        <label for="ruleName">Rule Name:</label>
-        <input name="ruleName" id="ruleName" placeholder="e.g. Greet User" required />
-        <label for="sendMethod">Send Method:</label>
-        <select name="sendMethod" id="sendMethod">
-            <option value="random">Random</option>
-            <option value="all">All</option>
-            <option value="once">Once (first one)</option>
-        </select>
-        <h2>Add Chat Reply</h2>
-        <label for="type">Type:</label>
-        <select name="type" id="type" required onchange="handleTypeChange()">
-            <option value="">--Select Type--</option>
-            <option value="exact_match">Exact Match</option>
-            <option value="pattern_matching">Pattern Matching</option>
-            <option value="expert_pattern_matching">Expert Regex</option>
-            <option value="welcome_message">Welcome Message</option>
-            <option value="default_message">Default Message</option>
-        </select>
-        <div id="keywordField" style="display:none;">
-            <label for="keyword">Keyword(s):</label>
-            <input name="keyword" id="keyword" placeholder="e.g. hi, hello" />
-        </div>
-        <div id="patternField" style="display:none;">
-            <label for="pattern">Regex Pattern:</label>
-            <input name="pattern" id="pattern" placeholder="Only for Expert Regex. Use () for capturing groups." />
-        </div>
-        <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <textarea name="replies" id="replies" required style="flex: 1"></textarea>
-          <button type="button" id="insertVarBtn" title="Insert Variable" style="
-              padding: 0;
-              height: 28px; width: 28px;
-              border-radius: 8px;
-              border: none;
-              background: #f3eaff;
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              box-shadow: 0 2px 8px #cac6eb55;
-          ">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7d38a8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
-              <polyline points="3 8 12 13 21 8"/>
+    <div class="form-card">
+        <a href="/admin/dashboard" class="back-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
-          </button>
-        </div>
-        <label for="priority">Priority:</label>
-        <input type="number" name="priority" id="priority" value="0" />
-        <div id="isDefaultField" style="display:none;">
-            <label for="isDefault">Is Default?</label>
-            <select name="isDefault" id="isDefault">
-                <option value="false">No</option>
-                <option value="true">Yes</option>
-            </select>
-        </div>
-        <button type="submit">Add Reply</button>
-    </form>
+            Back
+        </a>
+        <h2>Add Chat Reply</h2>
+        <form method="POST" action="/admin/add-chat-replies">
+            <label for="ruleName">Rule Name:</label>
+            <input name="ruleName" id="ruleName" placeholder="e.g. Greet User" required />
 
-    <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center;">
+            <label for="sendMethod">Send Method:</label>
+            <div class="select-wrapper">
+              <select name="sendMethod" id="sendMethod">
+                  <option value="random">Random</option>
+                  <option value="all">All</option>
+                  <option value="once">Once (first one)</option>
+              </select>
+            </div>
+
+            <label for="type">Type:</label>
+            <div class="select-wrapper">
+              <select name="type" id="type" required onchange="handleTypeChange()">
+                  <option value="">--Select Type--</option>
+                  <option value="exact_match">Exact Match</option>
+                  <option value="pattern_matching">Pattern Matching</option>
+                  <option value="expert_pattern_matching">Expert Regex</option>
+                  <option value="welcome_message">Welcome Message</option>
+                  <option value="default_message">Default Message</option>
+              </select>
+            </div>
+
+            <div id="keywordField" style="display:none;">
+                <label for="keyword">Keyword(s):</label>
+                <input name="keyword" id="keyword" placeholder="e.g. hi, hello" />
+            </div>
+            <div id="patternField" style="display:none;">
+                <label for="pattern">Regex Pattern:</label>
+                <input name="pattern" id="pattern" placeholder="Only for Expert Regex. Use () for capturing groups." />
+            </div>
+
+            <label for="replies">Replies (use &lt;#&gt; between lines):</label>
+            <div class="reply-area">
+              <textarea name="replies" id="replies" required></textarea>
+              <button type="button" id="insertVarBtn" title="Insert Variable" class="reply-icon-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
+                  <polyline points="3 8 12 13 21 8"/>
+                </svg>
+              </button>
+            </div>
+            <label for="priority">Priority:</label>
+            <input type="number" name="priority" id="priority" value="0" />
+
+            <div id="isDefaultField" style="display:none;">
+                <label for="isDefault">Is Default?</label>
+                <div class="select-wrapper">
+                    <select name="isDefault" id="isDefault">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-main">Add Reply</button>
+        </form>
+    </div>
+
+    <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center; opacity:0; pointer-events: none;">
       <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:240px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
         <div style="font-size:18px; font-weight:600; margin-bottom:10px; color:#7d38a8;">Variables</div>
-        <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:6px 10px;margin-bottom:12px;font-size:15px;border:1.2px solid #eee;border-radius:6px;">
+        <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:6px 10px;margin-bottom:12px;font-size:15px;border:1.2px solid #eee;border-radius:6px; box-sizing:border-box;">
         <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:180px; overflow:auto;">
           </ul>
         <div style="margin-top:14px; text-align:right;">
@@ -443,19 +723,26 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const allVars = [...defaultVars, ...window.customVars];
 
     // Popup Open/Close
+    const varPopup = document.getElementById('varPopup');
     document.getElementById('insertVarBtn').onclick = () => {
+      varPopup.style.opacity = '1';
+      varPopup.style.pointerEvents = 'auto';
       showVarPopup();
     };
-    document.getElementById('varCloseBtn').onclick = closeVarPopup;
+    document.getElementById('varCloseBtn').onclick = () => {
+      varPopup.style.opacity = '0';
+      varPopup.style.pointerEvents = 'none';
+      closeVarPopup();
+    };
 
     function showVarPopup() {
       renderVarList('');
-      document.getElementById('varPopup').style.display = 'flex';
+      // varPopup.style.display = 'flex'; // Handled by opacity/pointer-events for smooth transition
       document.getElementById('varSearch').value = '';
       document.getElementById('varSearch').focus();
     }
     function closeVarPopup() {
-      document.getElementById('varPopup').style.display = 'none';
+      // varPopup.style.display = 'none'; // Handled by opacity/pointer-events for smooth transition
     }
 
     // Render List
@@ -487,21 +774,22 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
       textarea.value = value.substring(0, start) + variable + value.substring(end);
       textarea.selectionStart = textarea.selectionEnd = start + variable.length;
       textarea.focus();
-      closeVarPopup();
+      varPopup.style.opacity = '0'; // Smooth fade out
+      varPopup.style.pointerEvents = 'none';
+      // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
     }
 
     // ESC key closes popup
     document.addEventListener('keydown', function(e){
-      if(document.getElementById('varPopup').style.display == 'flex' && e.key === 'Escape'){
-        closeVarPopup();
+      if(varPopup.style.pointerEvents == 'auto' && e.key === 'Escape'){ // Check pointer-events to see if popup is active
+        varPopup.style.opacity = '0';
+        varPopup.style.pointerEvents = 'none';
+        // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
       }
     });
     </script>
     `;
-    res.set({
-        'Content-Type': 'text/html',
-        'Content-Disposition': 'inline'
-    }).send(getHtmlTemplate('Add Chat Reply', addReplyForm));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Chat Reply', addReplyForm, true));
 });
 
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
@@ -695,83 +983,85 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         if (!reply) {
             return res.status(404).set('Content-Type', 'text/html').send(getHtmlTemplate('Not Found', '<p>Reply not found.</p><br><a href="/admin/reply-list">Back to List</a>'));
         }
-        // let customVarListHtml = ''; // No longer needed
         let customVarsJsArray = '[]';
         try {
             const customVariables = await CustomVariable.find({});
-            // customVarListHtml = customVariables.map(v => `<code>%${v.name}%</code>`).join(', '); // No longer needed
-            // if (customVarListHtml) {
-            //     customVarListHtml = `<br>**Custom Variables:** ${customVarListHtml}`; // No longer needed
-            // }
-            // Prepare JS array for client-side
             customVarsJsArray = JSON.stringify(customVariables.map(v => `%${v.name}%`));
         } catch (e) { console.error("Error fetching custom variables for form:", e); }
 
         const editReplyForm = `
-        <form method="POST" action="/admin/edit-reply/${reply._id}">
-            <label for="ruleName">Rule Name:</label>
-            <input name="ruleName" id="ruleName" value="${reply.ruleName}" required />
-            <label for="sendMethod">Send Method:</label>
-            <select name="sendMethod" id="sendMethod">
-                <option value="random" ${reply.sendMethod === 'random' ? 'selected' : ''}>Random</option>
-                <option value="all" ${reply.sendMethod === 'all' ? 'selected' : ''}>All</option>
-                <option value="once" ${reply.sendMethod === 'once' ? 'selected' : ''}>Once (first one)</option>
-            </select>
-            <h2>Edit Chat Reply</h2>
-            <label for="type">Type:</label>
-            <select name="type" id="type" required onchange="handleTypeChange()">
-                <option value="exact_match" ${reply.type === 'exact_match' ? 'selected' : ''}>Exact Match</option>
-                <option value="pattern_matching" ${reply.type === 'pattern_matching' ? 'selected' : ''}>Pattern Matching</option>
-                <option value="expert_pattern_matching" ${reply.type === 'expert_pattern_matching' ? 'selected' : ''}>Expert Regex</option>
-                <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
-                <option value="default_message" ${reply.type === 'default_message' ? 'selected' : ''}>Default Message</option>
-            </select>
-            <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
-                <label for="keyword">Keyword(s):</label>
-                <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
-            </div>
-            <div id="patternField" style="${reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
-                <label for="pattern">Regex Pattern:</label>
-                <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Only for Expert Regex. Use () for capturing groups." />
-            </div>
-            <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <textarea name="replies" id="replies" required style="flex: 1">${reply.replies.join('<#>')}</textarea>
-              <button type="button" id="insertVarBtn" title="Insert Variable" style="
-                  padding: 0;
-                  height: 28px; width: 28px;
-                  border-radius: 8px;
-                  border: none;
-                  background: #f3eaff;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  box-shadow: 0 2px 8px #cac6eb55;
-              ">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7d38a8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
-                  <polyline points="3 8 12 13 21 8"/>
+        <div class="form-card">
+            <a href="/admin/reply-list" class="back-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
-              </button>
-            </div>
-            <label for="priority">Priority:</label>
-            <input type="number" name="priority" id="priority" value="${reply.priority}" />
-            <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
-                <label for="isDefault">Is Default?</label>
-                <select name="isDefault" id="isDefault">
-                    <option value="false" ${!reply.isDefault ? 'selected' : ''}>No</option>
-                    <option value="true" ${reply.isDefault ? 'selected' : ''}>Yes</option>
-                </select>
-            </div>
-            <button type="submit">Update Reply</button>
-        </form>
-        <a href="/admin/reply-list">← Back to List</a>
+                Back
+            </a>
+            <h2>Edit Chat Reply</h2>
+            <form method="POST" action="/admin/edit-reply/${reply._id}">
+                <label for="ruleName">Rule Name:</label>
+                <input name="ruleName" id="ruleName" value="${reply.ruleName}" required />
 
-        <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center;">
+                <label for="sendMethod">Send Method:</label>
+                <div class="select-wrapper">
+                  <select name="sendMethod" id="sendMethod">
+                      <option value="random" ${reply.sendMethod === 'random' ? 'selected' : ''}>Random</option>
+                      <option value="all" ${reply.sendMethod === 'all' ? 'selected' : ''}>All</option>
+                      <option value="once" ${reply.sendMethod === 'once' ? 'selected' : ''}>Once (first one)</option>
+                  </select>
+                </div>
+
+                <label for="type">Type:</label>
+                <div class="select-wrapper">
+                  <select name="type" id="type" required onchange="handleTypeChange()">
+                      <option value="exact_match" ${reply.type === 'exact_match' ? 'selected' : ''}>Exact Match</option>
+                      <option value="pattern_matching" ${reply.type === 'pattern_matching' ? 'selected' : ''}>Pattern Matching</option>
+                      <option value="expert_pattern_matching" ${reply.type === 'expert_pattern_matching' ? 'selected' : ''}>Expert Regex</option>
+                      <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
+                      <option value="default_message" ${reply.type === 'default_message' ? 'selected' : ''}>Default Message</option>
+                  </select>
+                </div>
+
+                <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
+                    <label for="keyword">Keyword(s):</label>
+                    <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
+                </div>
+                <div id="patternField" style="${reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
+                    <label for="pattern">Regex Pattern:</label>
+                    <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Only for Expert Regex. Use () for capturing groups." />
+                </div>
+
+                <label for="replies">Replies (use &lt;#&gt; between lines):</label>
+                <div class="reply-area">
+                  <textarea name="replies" id="replies" required>${reply.replies.join('<#>')}</textarea>
+                  <button type="button" id="insertVarBtn" title="Insert Variable" class="reply-icon-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
+                      <polyline points="3 8 12 13 21 8"/>
+                    </svg>
+                  </button>
+                </div>
+                <label for="priority">Priority:</label>
+                <input type="number" name="priority" id="priority" value="${reply.priority}" />
+
+                <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
+                    <label for="isDefault">Is Default?</label>
+                    <div class="select-wrapper">
+                        <select name="isDefault" id="isDefault">
+                            <option value="false" ${!reply.isDefault ? 'selected' : ''}>No</option>
+                            <option value="true" ${reply.isDefault ? 'selected' : ''}>Yes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-main">Update Reply</button>
+            </form>
+        </div>
+
+        <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center; opacity:0; pointer-events: none;">
           <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:240px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
             <div style="font-size:18px; font-weight:600; margin-bottom:10px; color:#7d38a8;">Variables</div>
-            <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:6px 10px;margin-bottom:12px;font-size:15px;border:1.2px solid #eee;border-radius:6px;">
+            <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:6px 10px;margin-bottom:12px;font-size:15px;border:1.2px solid #eee;border-radius:6px; box-sizing:border-box;">
             <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:180px; overflow:auto;">
               </ul>
             <div style="margin-top:14px; text-align:right;">
@@ -809,19 +1099,26 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         const allVars = [...defaultVars, ...window.customVars];
 
         // Popup Open/Close
+        const varPopup = document.getElementById('varPopup');
         document.getElementById('insertVarBtn').onclick = () => {
+          varPopup.style.opacity = '1';
+          varPopup.style.pointerEvents = 'auto';
           showVarPopup();
         };
-        document.getElementById('varCloseBtn').onclick = closeVarPopup;
+        document.getElementById('varCloseBtn').onclick = () => {
+          varPopup.style.opacity = '0';
+          varPopup.style.pointerEvents = 'none';
+          closeVarPopup();
+        };
 
         function showVarPopup() {
           renderVarList('');
-          document.getElementById('varPopup').style.display = 'flex';
+          // varPopup.style.display = 'flex'; // Handled by opacity/pointer-events for smooth transition
           document.getElementById('varSearch').value = '';
           document.getElementById('varSearch').focus();
         }
         function closeVarPopup() {
-          document.getElementById('varPopup').style.display = 'none';
+          // varPopup.style.display = 'none'; // Handled by opacity/pointer-events for smooth transition
         }
 
         // Render List
@@ -853,18 +1150,22 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
           textarea.value = value.substring(0, start) + variable + value.substring(end);
           textarea.selectionStart = textarea.selectionEnd = start + variable.length;
           textarea.focus();
-          closeVarPopup();
+          varPopup.style.opacity = '0'; // Smooth fade out
+          varPopup.style.pointerEvents = 'none';
+          // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
         }
 
         // ESC key closes popup
         document.addEventListener('keydown', function(e){
-          if(document.getElementById('varPopup').style.display == 'flex' && e.key === 'Escape'){
-            closeVarPopup();
+          if(varPopup.style.pointerEvents == 'auto' && e.key === 'Escape'){ // Check pointer-events to see if popup is active
+            varPopup.style.opacity = '0';
+            varPopup.style.pointerEvents = 'none';
+            // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
           }
         });
         </script>
         `;
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm, true));
     } catch (error) {
         console.error('Error fetching reply for edit:', error);
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading reply for edit.</p><br><a href="/admin/reply-list">Back to List</a>'));
