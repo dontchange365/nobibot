@@ -69,10 +69,10 @@ function isAuthenticated(req, res, next) {
     if (req.session.loggedIn) return next();
     return res.redirect('/admin/login');
 }
-function getHtmlTemplate(title, bodyContent, includeFormStyles = false) {
+function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeDashboardStyles = false) {
     let styles = '';
     if (includeFormStyles) {
-        styles = `
+        styles += `
         <style>
             body {
                 background: linear-gradient(120deg, #eceafd 70%, #e2d4f5 100%);
@@ -345,6 +345,241 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false) {
         </style>
         `;
     }
+    if (includeDashboardStyles) {
+        styles += `
+        <style>
+            body {
+                background: linear-gradient(120deg, #F3E6FF 0%, #D3D1FF 100%);
+                min-height: 100vh;
+                font-family: 'Lexend', 'Roboto', sans-serif;
+                margin: 0;
+                padding: 0;
+            }
+            .admin-container {
+                max-width: 700px;
+                margin: 36px auto 0 auto;
+                padding: 0 12px;
+            }
+            h1 {
+                font-size: 2.1rem;
+                color: #7023d8;
+                letter-spacing: 0.7px;
+                margin-bottom: 24px;
+                text-align: left;
+                font-weight: 800;
+            }
+            .card-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 22px;
+                margin-bottom: 40px;
+            }
+            .admin-card {
+                background: linear-gradient(120deg, #b99cff 0%, #e0c6fa 90%);
+                border-radius: 22px;
+                box-shadow: 0 3px 18px #ab7fee4a, 0 1.5px 4px #a68aff22;
+                padding: 36px 18px 28px 18px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                cursor: pointer;
+                transition: transform 0.16s, box-shadow 0.18s;
+                position: relative;
+                min-height: 125px;
+                border: 2.5px solid #fff;
+                font-size: 1.12rem;
+                text-align: center;
+                text-decoration: none; /* For anchor tags */
+                color: inherit; /* For anchor tags */
+            }
+            .admin-card:active, .admin-card:focus, .admin-card:hover {
+                transform: scale(1.045) translateY(-2px) rotate(-1.1deg);
+                box-shadow: 0 7px 28px #7023d855, 0 2px 8px #ab7fee2a;
+                z-index: 2;
+            }
+            .admin-card .lucide {
+                font-size: 2.1rem;
+                margin-bottom: 12px;
+                color: #8338ec;
+                filter: drop-shadow(0 1px 2px #f6f2ffb8);
+            }
+            /* Reply List specific styles from previous versions, adjusted */
+            .nobita-reply-panel {
+                max-width: 600px;
+                margin: 32px auto 60px auto;
+                padding: 0 6px;
+                position: relative; /* Needed for positioning the add button */
+            }
+            .nobita-title {
+                color: #8227b3; /* Changed to match form heading color */
+                font-family: 'Lexend', sans-serif;
+                letter-spacing: 1.5px;
+                margin-bottom: 24px;
+                text-align: center;
+                font-weight: 800;
+                font-size: 2.1rem;
+                text-shadow: 0 2px 14px #e3d2ff7c;
+            }
+            .reply-list-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 24px;
+                padding: 0 10px; /* Add some padding to align with cards */
+            }
+            .add-reply-btn-top {
+                background: linear-gradient(90deg, #7e4af5 40%, #bf51e8 100%); /* Same as main button */
+                color: #fff;
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-weight: 600;
+                text-decoration: none;
+                font-size: 15px;
+                transition: background 0.2s, transform 0.12s, box-shadow 0.17s;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                box-shadow: 0 2px 8px #c79fff44;
+            }
+            .add-reply-btn-top:hover {
+                background: linear-gradient(90deg, #6124d4 40%, #8227b3 100%);
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px #b48ffa55;
+            }
+             .add-reply-btn-top:active {
+                transform: scale(0.98);
+                box-shadow: 0 1px 4px #b48ffa55;
+            }
+            .add-reply-btn-top .lucide {
+                font-size: 1.2rem;
+            }
+
+            .reply-card {
+                background: linear-gradient(98deg, #272733 80%, #3d1153 100%);
+                border: 1.5px solid #d074f9cc;
+                border-radius: 16px;
+                box-shadow: 0 3px 18px #0006;
+                padding: 16px 16px 12px 16px;
+                margin-bottom: 30px;
+                position: relative;
+            }
+            .reply-header {
+                font-size: 19px;
+                font-weight: 700;
+                color: #fff;
+                letter-spacing: 1px;
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .reply-title {
+                text-transform: uppercase;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .reply-inner {
+                background: rgba(34,34,40,0.75);
+                border-radius: 10px;
+                padding: 12px 14px 8px 14px;
+            }
+            .reply-row {
+                display: flex;
+                gap: 8px;
+                align-items: flex-start;
+                margin-bottom: 7px;
+                flex-wrap: wrap;
+            }
+            .reply-label {
+                min-width: 70px;
+                color: #ffc952;
+                font-family: 'Lexend', 'Inter', sans-serif;
+                font-weight: 600;
+                font-size: 15px;
+                letter-spacing: 0.3px;
+            }
+            .reply-label.send { color: #ff6f61; }
+            .reply-label.receive { color: #46e579; }
+            .reply-receive, .reply-send {
+                color: #fff;
+                font-family: 'Roboto Mono', monospace;
+                font-size: 15px;
+                white-space: pre-line;
+                word-break: break-all;
+            }
+            hr {
+                border: 0;
+                border-top: 1.5px dashed #b197d6;
+                margin: 8px 0 8px 0;
+            }
+            .reply-actions {
+                position: absolute;
+                top: 14px;
+                right: 20px;
+                display: flex;
+                gap: 10px;
+            }
+            .reply-actions a svg {
+                stroke: #ffc952;
+                background: #232337;
+                border-radius: 6px;
+                padding: 2px;
+                transition: background 0.15s, stroke 0.15s;
+            }
+            .reply-actions a:hover svg {
+                background: #ffc952;
+                stroke: #232337;
+            }
+            .btn.back {
+                background: #282836;
+                color: #ffc952;
+                padding: 10px 22px;
+                border-radius: 7px;
+                text-decoration: none;
+                font-weight: 700;
+                font-size: 16px;
+                margin-left: 0;
+                display: block;
+                width: fit-content;
+            }
+            .btn.back:hover { background: #ffc952; color: #282836; }
+
+
+            @media (max-width: 700px) {
+                .admin-container { max-width: 98vw; }
+                .card-grid { grid-template-columns: 1fr; gap: 20px; }
+                .admin-card { min-height: 110px; }
+                h1 { font-size: 1.35rem; }
+
+                .add-reply-btn-top {
+                    padding: 7px 10px;
+                    font-size: 0; /* Hide text */
+                    width: 40px; /* Fixed width for icon only */
+                    height: 40px; /* Fixed height for icon only */
+                    border-radius: 50%; /* Make it round */
+                    justify-content: center;
+                    align-items: center;
+                }
+                .add-reply-btn-top .lucide {
+                    margin: 0; /* Remove margin */
+                    font-size: 1.5rem; /* Bigger icon */
+                }
+                .add-reply-btn-top span {
+                    display: none; /* Hide text */
+                }
+                .nobita-title {
+                    font-size: 1.8rem;
+                    text-align: left;
+                }
+                 .reply-list-header {
+                    align-items: flex-start;
+                    padding: 0;
+                }
+            }
+        </style>
+        `;
+    }
     return `
     <!DOCTYPE html>
     <html lang="en">
@@ -352,17 +587,26 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${title}</title>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-        <link rel="stylesheet" href="/style.css">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Lexend:wght@600;800&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.306.0/dist/lucide-static.min.css"/>
         ${styles}
     </head>
     <body>
         ${bodyContent}
+        <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+        <script>lucide.createIcons();</script>
     </body>
     </html>
     `;
 }
 const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+// Helper function to truncate text
+function trimText(txt, wordLimit) {
+    if (!txt) return '';
+    const words = txt.trim().split(/\s+/);
+    return words.length > wordLimit ? words.slice(0, wordLimit).join(" ") + "..." : txt;
+}
 
 // --- handleReplySend (main reply engine with variables support) ---
 async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSession = {}) {
@@ -514,14 +758,17 @@ app.post('/api/chatbot/message', async (req, res) => {
             }
         }
 
-        const regexMatches = await ChatReply.find({ type: 'expert_pattern_matching', pattern: { $ne: null } }).sort({ priority: -1 });
+        const regexMatches = await ChatReply.find({ type: 'expert_pattern_matching' }).sort({ priority: -1 });
         for (const reply of regexMatches) {
             try {
-                const regex = new RegExp(reply.pattern, 'i');
-                const match = regex.exec(userMessage);
-                if (match) {
-                    matchedRegexGroups = match;
-                    return res.json({ reply: await handleReplySend(reply, userMessage, matchedRegexGroups, req.session) });
+                // Ensure pattern exists and is not null/empty for regex type
+                if (reply.pattern) {
+                    const regex = new RegExp(reply.pattern, 'i');
+                    const match = regex.exec(userMessage);
+                    if (match) {
+                        matchedRegexGroups = match;
+                        return res.json({ reply: await handleReplySend(reply, userMessage, matchedRegexGroups, req.session) });
+                    }
                 }
             } catch (e) { console.error("Regex pattern error:", e); }
         }
@@ -564,38 +811,29 @@ app.post('/admin/login', async (req, res) => {
 // -- Admin Dashboard
 app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     const dashboardContent = `
-    <h1>Welcome Admin: ${req.session.username}</h1>
-    <ul class="admin-links-list">
-        <li><a href="/admin/add-chat-replies">➕ Add Chat Reply</a></li>
-        <li><a href="/admin/reply-list">📃 View Replies</a></li>
-        <li><a href="/admin/custom-variables">🔧 Manage Custom Variables</a></li>
-        <li><a href="/admin/logout">🚪 Logout</a></li>
-    </ul>
-    <style>
-        .admin-links-list {
-            list-style: none;
-            padding: 0;
-            margin: 20px 0;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .admin-links-list li a {
-            display: block;
-            background-color: #4f46e5;
-            color: #fff;
-            padding: 12px 20px;
-            border-radius: 6px;
-            font-size: 16px;
-            text-decoration: none;
-            transition: background 0.3s;
-        }
-        .admin-links-list li a:hover {
-            background-color: #4338ca;
-        }
-    </style>
+    <div class="admin-container">
+        <h1>Welcome Admin: <span id="adminName">${req.session.username || 'Admin'}</span></h1>
+        <div class="card-grid">
+            <a href="/admin/add-chat-replies" class="admin-card">
+                <i class="lucide lucide-plus-square"></i>
+                <span>Add Chat Reply</span>
+            </a>
+            <a href="/admin/reply-list" class="admin-card">
+                <i class="lucide lucide-list"></i>
+                <span>View Replies</span>
+            </a>
+            <a href="/admin/custom-variables" class="admin-card">
+                <i class="lucide lucide-wrench"></i>
+                <span>Manage Custom Variables</span>
+            </a>
+            <a href="/admin/logout" class="admin-card">
+                <i class="lucide lucide-log-out"></i>
+                <span>Logout</span>
+            </a>
+        </div>
+    </div>
     `;
-    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Dashboard', dashboardContent));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Dashboard', dashboardContent, false, true));
 });
 
 // -- Logout
@@ -732,7 +970,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     document.getElementById('varCloseBtn').onclick = () => {
       varPopup.style.opacity = '0';
       varPopup.style.pointerEvents = 'none';
-      closeVarPopup();
+      // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
     };
 
     function showVarPopup() {
@@ -741,9 +979,9 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
       document.getElementById('varSearch').value = '';
       document.getElementById('varSearch').focus();
     }
-    function closeVarPopup() {
-      // varPopup.style.display = 'none'; // Handled by opacity/pointer-events for smooth transition
-    }
+    // function closeVarPopup() { // Moved to onclick of closeVarBtn to handle animation
+    //   // varPopup.style.display = 'none'; // Handled by opacity/pointer-events for smooth transition
+    // }
 
     // Render List
     function renderVarList(filter) {
@@ -822,14 +1060,22 @@ function getReplyIcon(r) {
     if (r.type === 'default_message') return "💬";
     return "";
 }
+
+// Function to truncate text to a word limit
+function truncateWords(str, wordLimit) {
+    if (!str) return '';
+    const words = str.trim().split(/\s+/); // Split by one or more spaces
+    return words.length > wordLimit ? words.slice(0, wordLimit).join(" ") + "..." : str;
+}
 function formatReceive(r) {
-    if (r.type === 'exact_match' || r.type === 'pattern_matching') return r.keyword || '-';
-    if (r.type === 'expert_pattern_matching') return r.pattern || '-';
-    return (r.keyword || r.pattern || '-');
+    const text = (r.type === 'exact_match' || r.type === 'pattern_matching') ? r.keyword : (r.type === 'expert_pattern_matching' ? r.pattern : (r.keyword || r.pattern || '-'));
+    return truncateWords(text, 4); // Limit to 4 words for receive
 }
 function formatSend(r) {
-    return (r.replies || []).join('<#>').slice(0, 600) + ((r.replies.join('<#>').length > 600) ? ' ...' : '');
+    const text = (r.replies || []).join('<#>');
+    return truncateWords(text, 20); // Limit to 20 words for send
 }
+
 
 // ========== Stylish /admin/reply-list Route ==========
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
@@ -862,26 +1108,69 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     `).join('');
     const content = `
         <div class="nobita-reply-panel">
-            <h2 class="nobita-title">REPLY LIST</h2>
+            <div class="reply-list-header">
+                <h2 class="nobita-title">REPLY LIST</h2>
+                <a href="/admin/add-chat-replies" class="add-reply-btn-top">
+                    <i class="lucide lucide-plus"></i>
+                    <span>Add Reply</span>
+                </a>
+            </div>
             ${listItems || '<em>No replies found.</em>'}
             <a class="btn back" href="/admin/dashboard" style="margin-top:24px;">← Back to Dashboard</a>
         </div>
         <style>
-            body { background: #1a1a1a; }
-            .nobita-title {
-                color: #fff;
-                font-family: 'Lexend', 'Inter', sans-serif;
-                letter-spacing: 1px;
-                margin-bottom: 24px;
-                text-align: center;
-                font-weight: 700;
-                font-size: 28px;
-            }
+            body { background: #1a1a1a; } /* Default background for reply list */
             .nobita-reply-panel {
                 max-width: 600px;
                 margin: 32px auto 60px auto;
                 padding: 0 6px;
+                position: relative;
             }
+            .nobita-title {
+                color: #fff; /* Revert to white for this dark background */
+                font-family: 'Lexend', sans-serif;
+                letter-spacing: 1px;
+                margin-bottom: 0; /* Adjusted for flex container */
+                text-align: left;
+                font-weight: 700;
+                font-size: 28px;
+                text-shadow: none; /* Removed for dark background */
+            }
+            .reply-list-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 24px;
+                padding: 0; /* Reset padding for consistency */
+            }
+            .add-reply-btn-top {
+                background: linear-gradient(90deg, #4f46e5 40%, #6138ca 100%); /* Adjusted for dark background */
+                color: #fff;
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-weight: 600;
+                text-decoration: none;
+                font-size: 15px;
+                transition: background 0.2s, transform 0.12s, box-shadow 0.17s;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                box-shadow: 0 2px 8px #0004;
+            }
+            .add-reply-btn-top:hover {
+                background: linear-gradient(90deg, #4338ca 40%, #512f9b 100%);
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px #0006;
+            }
+             .add-reply-btn-top:active {
+                transform: scale(0.98);
+                box-shadow: 0 1px 4px #0005;
+            }
+            .add-reply-btn-top .lucide {
+                font-size: 1.2rem;
+            }
+
+
             .reply-card {
                 background: linear-gradient(98deg, #272733 80%, #3d1153 100%);
                 border: 1.5px solid #d074f9cc;
@@ -972,9 +1261,37 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
                 width: fit-content;
             }
             .btn.back:hover { background: #ffc952; color: #282836; }
+
+            /* Responsive Adjustments for Reply List */
+            @media (max-width: 700px) {
+                .add-reply-btn-top {
+                    padding: 7px 10px;
+                    font-size: 0; /* Hide text */
+                    width: 40px; /* Fixed width for icon only */
+                    height: 40px; /* Fixed height for icon only */
+                    border-radius: 50%; /* Make it round */
+                    justify-content: center;
+                    align-items: center;
+                }
+                .add-reply-btn-top .lucide {
+                    margin: 0; /* Remove margin */
+                    font-size: 1.5rem; /* Bigger icon */
+                }
+                .add-reply-btn-top span {
+                    display: none; /* Hide text */
+                }
+                .nobita-title {
+                    font-size: 1.8rem;
+                    text-align: left;
+                }
+                 .reply-list-header {
+                    align-items: flex-start;
+                    padding: 0;
+                }
+            }
         </style>
     `;
-    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content, false, true)); // Pass true for dashboard styles
 });
 // ========== EDIT REPLY ==========
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
@@ -1108,7 +1425,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         document.getElementById('varCloseBtn').onclick = () => {
           varPopup.style.opacity = '0';
           varPopup.style.pointerEvents = 'none';
-          closeVarPopup();
+          // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
         };
 
         function showVarPopup() {
@@ -1117,9 +1434,9 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
           document.getElementById('varSearch').value = '';
           document.getElementById('varSearch').focus();
         }
-        function closeVarPopup() {
-          // varPopup.style.display = 'none'; // Handled by opacity/pointer-events for smooth transition
-        }
+        // function closeVarPopup() { // Moved to onclick of closeVarBtn to handle animation
+        //   // varPopup.style.display = 'none'; // Handled by opacity/pointer-events for smooth transition
+        // }
 
         // Render List
         function renderVarList(filter) {
@@ -1160,9 +1477,13 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
           if(varPopup.style.pointerEvents == 'auto' && e.key === 'Escape'){ // Check pointer-events to see if popup is active
             varPopup.style.opacity = '0';
             varPopup.style.pointerEvents = 'none';
-            // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
-          }
-        });
+            // closeVarPopup(); // This is implicitly handled by thegth > 0 || (varPopup.style.display === 'flex' && e.key === 'Escape')) {
+            // varPopup.style.display = 'none';
+        // }
+        // // Close popup if click outside
+        // varPopup.onclick = e => {
+        //     if (e.target === varPopup) closeVarPopup();
+        // };
         </script>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm, true));
