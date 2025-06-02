@@ -1,0 +1,37 @@
+/* public/import-export.css */
+#ruleImportExportModal {
+  position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; background: rgba(30,8,70,0.30);
+  display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+#ruleImportExportModal.show { opacity: 1; pointer-events: auto; }
+#ruleImportExportModal .modal-box {
+  background: #fff; border-radius: 16px; min-width: 310px; max-width: 95vw; padding: 40px 22px 24px 22px; box-shadow: 0 8px 40px #825be030;
+  animation: popin .44s cubic-bezier(.12,1.13,.4,1.06);
+  display: flex; flex-direction: column; align-items: center; gap: 18px; position: relative;
+}
+#ruleImportExportModal .close-btn {
+  position: absolute; top: 10px; right: 14px; background: #f3edff; border: none; border-radius: 8px; color: #7a3de7; font-size: 22px; width: 34px; height: 34px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.rule-btn-row { display: flex; gap: 14px; margin-bottom: 8px; }
+.rule-btn {
+  padding: 13px 22px; background: linear-gradient(92deg, #a78bfa 30%, #b583f3 100%);
+  color: #fff; border: none; border-radius: 10px; font-weight: 700; font-size: 1.04rem;
+  cursor: pointer; box-shadow: 0 2px 14px #b48ffa2e; transition: background 0.13s, transform 0.13s;
+  display: flex; align-items: center; gap: 6px;
+}
+.rule-btn:hover { background: linear-gradient(92deg, #a14ffb 10%, #7220d6 100%); transform: scale(1.05);}
+#fileUploadBox, #exportBox { margin-top: 20px; width: 100%; }
+#importTypeBtns { display: flex; gap: 12px; margin-bottom: 14px; }
+#importTypeBtns button {
+  padding: 9px 17px; border-radius: 8px; border: none; font-weight: 600; font-size: 1.02rem; cursor: pointer;
+  background: #ede5fc; color: #6b30e2; box-shadow: 0 2px 7px #a58ed933; transition: background 0.13s, color 0.13s;
+}
+#importTypeBtns button.selected, #importTypeBtns button:hover {
+  background: #8b53e7; color: #fff;
+}
+#ruleExportName {
+  width: 100%; padding: 10px 13px; border-radius: 8px; border: 1.2px solid #e2e5fa;
+  font-size: 1.08rem; margin-bottom: 10px;
+}
+@keyframes popin { from { opacity: 0; transform: scale(0.93) translateY(80px);} to { opacity: 1; transform: none;} }
