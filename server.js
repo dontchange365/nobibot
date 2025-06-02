@@ -1,5 +1,3 @@
-// ========== server.js ==========
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
@@ -99,16 +97,23 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
         case 'random':
         default: replyText = randomReply(replyObj.replies); break;
     }
+
+    // --- 1. Nested Custom Variable Resolver (with random pick for custom variable values) ---
     try {
         const customVariables = await CustomVariable.find({});
-        // Nested variable resolver
         function resolveNestedVars(text) {
             let prev, round = 0;
             do {
                 prev = text;
                 for (const variable of customVariables) {
+                    let value = variable.value;
+                    // RANDOM PICK LOGIC FOR VARIABLE VALUE (for custom variables like 'val1,val2,val3')
+                    if (value.includes(',')) {
+                        const parts = value.split(',').map(x => x.trim());
+                        value = parts[Math.floor(Math.random() * parts.length)];
+                    }
                     const regex = new RegExp(`%${variable.name}%`, 'g');
-                    text = text.replace(regex, variable.value);
+                    text = text.replace(regex, value);
                 }
                 round++;
             } while (/%[a-zA-Z0-9_]+%/.test(text) && text !== prev && round < 10);
@@ -117,7 +122,57 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
         replyText = resolveNestedVars(replyText);
     } catch (error) { console.error("Custom variable error:", error); }
 
-    // --- (Variable replacements for message, name, time, etc...) ---
+    // --- 2. Random Dynamic Variable Patterns ---
+    // RANDOM NUMBER (e.g. %rndm_num_10_99%)
+    replyText = replyText.replace(/%rndm_num_(-?\d+)_(-?\d+)%/g, (_, a, b) => {
+        a = parseInt(a), b = parseInt(b);
+        return String(Math.floor(Math.random() * (b - a + 1)) + a);
+    });
+
+    // RANDOM CUSTOM LIST (e.g. %rndm_custom_2_hi,hello,bye%)
+    replyText = replyText.replace(/%rndm_custom_(\d+)_([^%]+)%/g, (_, count, set) => {
+        let items = set.split(',').map(x => x.trim());
+        let picked = [];
+        for (let i = 0; i < Number(count); i++) {
+            picked.push(items[Math.floor(Math.random() * items.length)]);
+        }
+        return picked.join('');
+    });
+
+    // RANDOM LOWERCASE ABC (e.g. %rndm_abc_lower_3%)
+    replyText = replyText.replace(/%rndm_abc_lower_(\d+)%/g, (_, len) => {
+        let chars = 'abcdefghijklmnopqrstuvwxyz';
+        return Array.from({length: Number(len)}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+    });
+
+    // RANDOM UPPERCASE ABC (e.g. %rndm_abc_upper_5%)
+    replyText = replyText.replace(/%rndm_abc_upper_(\d+)%/g, (_, len) => {
+        let chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        return Array.from({length: Number(len)}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+    });
+
+    // RANDOM ALPHA-NUMERIC (e.g. %rndm_alnum_8%)
+    replyText = replyText.replace(/%rndm_alnum_(\d+)%/g, (_, len) => {
+        let chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        return Array.from({length: Number(len)}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+    });
+
+    // RANDOM ASCII (e.g. %rndm_ascii_10%)
+    replyText = replyText.replace(/%rndm_ascii_(\d+)%/g, (_, len) => {
+        let result = '';
+        for (let i = 0; i < Number(len); i++) {
+            result += String.fromCharCode(Math.floor(Math.random() * 94) + 33); // ASCII characters from ! to ~
+        }
+        return result;
+    });
+
+    // RANDOM GRAWLIX (e.g. %rndm_grawlix_4%)
+    replyText = replyText.replace(/%rndm_grawlix_(\d+)%/g, (_, len) => {
+        let chars = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+        return Array.from({length: Number(len)}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+    });
+
+    // --- 3. System Variables ---
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     replyText = replyText.replace(/%message%/g, userMessage || '');
     replyText = replyText.replace(/%message_(\d+)%/g, (match, len) => (userMessage || '').substring(0, parseInt(len)));
@@ -126,13 +181,13 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
             return matchedRegexGroups[parseInt(groupId)] || '';
         });
     }
-    const userName = reqSession.username || 'User';
+    const userName = reqSession.username || 'User'; // Get username from session
     replyText = replyText.replace(/%name%/g, userName);
     replyText = replyText.replace(/%first_name%/g, userName.split(' ')[0] || '');
     replyText = replyText.replace(/%last_name%/g, userName.split(' ').slice(1).join(' ') || '');
     replyText = replyText.replace(/%chat_name%/g, userName);
 
-    // --- Date & time variables ---
+    // Date & time variables
     const optionsDate = { year: 'numeric', month: 'long', day: 'numeric' };
     const optionsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
     replyText = replyText.replace(/%date%/g, now.toLocaleDateString('en-IN', optionsDate));
@@ -145,8 +200,6 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
     replyText = replyText.replace(/%month%/g, String(now.getMonth() + 1).padStart(2, '0'));
     replyText = replyText.replace(/%year%/g, String(now.getFullYear()));
 
-    // -- Random string/grawlix stuff (optional, add if you want full support) --
-    // .. (Skipping for brevity, add if you need advanced random variables)
     return replyText;
 }
 
@@ -399,21 +452,21 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
-                <span class="reply-title">${(r.ruleName || 'Untitled').toUpperCase()} ${getReplyIcon(r)}</span>
-            </div>
-            <div class="reply-inner">
-                <div class="reply-row">
-                    <span class="reply-label receive">Receive:</span>
-                    <span class="reply-receive">${formatReceive(r)}</span>
+                <span class="reply-title">${(r.ruleName || 'Untitled').toUpperCase()} <span class="math-inline">\{getReplyIcon\(r\)\}</span\>
+</div\>
+<div class\="reply\-inner"\>
+<div class\="reply\-row"\>
+<span class\="reply\-label receive"\>Receive\:</span\>
+<span class\="reply\-receive"\></span>{formatReceive(r)}</span>
                 </div>
                 <hr>
                 <div class="reply-row">
                     <span class="reply-label send">Send:</span>
-                    <span class="reply-send">${formatSend(r)}</span>
-                </div>
-            </div>
-            <div class="reply-actions">
-                <a href="/admin/edit-reply/${r._id}" title="Edit">
+                    <span class="reply-send"><span class="math-inline">\{formatSend\(r\)\}</span\>
+</div\>
+</div\>
+<div class\="reply\-actions"\>
+<a href\="/admin/edit\-reply/</span>{r._id}" title="Edit">
                   <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
                 </a>
                 <a href="/admin/delete-reply/${r._id}" title="Delete" onclick="return confirm('Delete this rule?')">
@@ -554,9 +607,9 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             }
         } catch (e) { console.error("Error fetching custom variables for form:", e); }
         const editReplyForm = `
-        <form method="POST" action="/admin/edit-reply/${reply._id}">
-            <label for="ruleName">Rule Name:</label>
-            <input name="ruleName" id="ruleName" value="${reply.ruleName}" required />
+        <form method="POST" action="/admin/edit-reply/<span class="math-inline">\{reply\.\_id\}"\>
+<label for\="ruleName"\>Rule Name\:</label\>
+<input name\="ruleName" id\="ruleName" value\="</span>{reply.ruleName}" required />
             <label for="sendMethod">Send Method:</label>
             <select name="sendMethod" id="sendMethod">
                 <option value="random" ${reply.sendMethod === 'random' ? 'selected' : ''}>Random</option>
@@ -570,28 +623,28 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 <option value="pattern_matching" ${reply.type === 'pattern_matching' ? 'selected' : ''}>Pattern Matching</option>
                 <option value="expert_pattern_matching" ${reply.type === 'expert_pattern_matching' ? 'selected' : ''}>Expert Regex</option>
                 <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
-                <option value="default_message" ${reply.type === 'default_message' ? 'selected' : ''}>Default Message</option>
-            </select>
-            <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
+                <option value="default_message" <span class="math-inline">\{reply\.type \=\=\= 'default\_message' ? 'selected' \: ''\}\>Default Message</option\>
+</select\>
+<div id\="keywordField" style\="</span>{(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
                 <label for="keyword">Keyword(s):</label>
-                <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
-            </div>
-            <div id="patternField" style="${reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
+                <input name="keyword" id="keyword" value="<span class="math-inline">\{reply\.keyword \|\| ''\}" placeholder\="e\.g\. hi, hello" /\>
+</div\>
+<div id\="patternField" style\="</span>{reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
                 <label for="pattern">Regex Pattern:</label>
-                <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Only for Expert Regex. Use () for capturing groups." />
-            </div>
-            <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-            <textarea name="replies" id="replies" required>${reply.replies.join('<#>')}</textarea>
+                <input name="pattern" id="pattern" value="<span class="math-inline">\{reply\.pattern \|\| ''\}" placeholder\="Only for Expert Regex\. Use \(\) for capturing groups\." /\>
+</div\>
+<label for\="replies"\>Replies \(use &lt;\#&gt; between lines\)\:</label\>
+<textarea name\="replies" id\="replies" required\></span>{reply.replies.join('<#>')}</textarea>
             <small>
                 **Available replacements:**<br>
                 **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
                 **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
                 **Date & Time:** %date%, %time%, %hour%, %minute%, %second%, %am/pm%, %day_of_month%, %month%, %year%<br>
                 **AutoResponder:** %rule_id%<br>
-                ${customVarList}
-            </small>
-            <label for="priority">Priority:</label>
-            <input type="number" name="priority" id="priority" value="${reply.priority}" />
+                <span class="math-inline">\{customVarList\}
+</small\>
+<label for\="priority"\>Priority\:</label\>
+<input type\="number" name\="priority" id\="priority" value\="</span>{reply.priority}" />
             <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
                 <label for="isDefault">Is Default?</label>
                 <select name="isDefault" id="isDefault">
