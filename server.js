@@ -11,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // --- DB URI ---
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://dontchange365:DtUiOMFzQVM0tG9l@nobifeedback.9ntuipc.mongodb.net/?retryWrites=true&w=majority&appName=nobifeedback';
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://dontchange365:DtUiOMFzQVM0tG9l@nobifeedback.9ntuipc.mongodb.net/?retryWrites=true&w=appName=nobifeedback';
 
 // --- Connect MongoDB ---
 mongoose.connect(MONGO_URI)
@@ -331,7 +331,6 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
             table th, table td { padding: 9px 10px; border-bottom: 1px solid #ececec; }
             table thead tr { border-bottom: 2px solid #ddd; } /* Thicker line for header */
             table th { background: #ede7fe; color: #482998; font-weight:700; text-align: left;} /* Align header text left */
-            table tr:last-child td { border-bottom:none; } /* No border for last row */
             table thead tr:first-child th:first-child { border-top-left-radius: 12px; } /* Top-left corner for header */
             table thead tr:first-child th:last-child { border-top-right-radius: 12px; } /* Top-right corner for header */
 
@@ -359,13 +358,13 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     // All vars to be used for picker (default + custom)
     const defaultVars = [
         "%message%", "%message_LENGTH%", "%capturing_group_ID%", "%name%",
-        "%first_name%", "%last_name%", "%chat_name%", "%last_name%", "%date%", "%time%",
+        "%first_name%", "%last_name%", "%chat_name%", "%date%", "%time%",
         "%hour%", "%minute%", "%second%", "%am/pm%", "%day_of_month%", "%month%", "%year%", "%rule_id%"
     ];
     const allVars = [...defaultVars, ...customVarArr];
     // Make HTML for variable buttons server-side (no allVars.map in browser!)
     const variableButtonsHTML = allVars.map(v =>
-        `<button style="padding:10px 0;border-radius:9px;border:1.5px solid #e5e6ff;background:#272753;color:#ffd870;font-family:Roboto Mono,monospace;font-size:15px;cursor:pointer;font-weight:600;transition:.15s;" onclick="insertVariable('replies','${v.replace(/'/g,"\\'")}')">${v}</button>`
+        `<button onclick="insertVariable('replies','${v.replace(/'/g,"\\'")}')">${v}</button>`
     ).join('');
 
     const addReplyForm = `
@@ -415,6 +414,9 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         <button type="submit" style="width:100%;margin-top:20px;padding:12px 0;background:#296aff;color:#fff;font-weight:700;font-size:18px;border:none;border-radius:8px;">Add Reply</button>
     </form>
     <script>
+    // Server-side generated HTML for variable buttons
+    window.variableButtonsHTML = \`${variableButtonsHTML}\`;
+
     function showVariablePicker(inputId) {
         let modal = document.getElementById('varPickerModal');
         if (!modal) {
@@ -422,12 +424,14 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
             modal.id = 'varPickerModal';
             modal.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:#19193be3;display:flex;align-items:center;justify-content:center;z-index:5000;";
             modal.innerHTML = \`
-              <div style="background:#212245;padding:22px 16px 12px 16px;border-radius:18px;box-shadow:0 8px 36px #000a;width:355px;max-width:94vw;">
-                <h2 style="color:#ffd870;margin-bottom:12px;text-align:center;font-family:Lexend,Inter,sans-serif;font-size:22px;font-weight:700;letter-spacing:.3px;">Insert Variable</h2>
-                <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px 10px;margin-bottom:16px;">
-                  ${variableButtonsHTML}
+              <div class="custom-var-popup">
+                <div class="var-popup-header">
+                    <span>Insert Variable</span>
+                    <button onclick="document.getElementById('varPickerModal').remove()" class="close-var-popup">×</button>
                 </div>
-                <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:8px 30px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:17px;display:block;margin:auto;">Close</button>
+                <div class="var-popup-list">
+                    \${window.variableButtonsHTML || ''}
+                </div>
               </div>
             \`;
             document.body.appendChild(modal);
@@ -472,6 +476,67 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     }
     input:focus, textarea:focus, select:focus { border-color: #367aff; background: #f4f8ff;}
     label { font-weight: 600; color: #212245; margin-bottom: 5px; display:block; }
+    /* --- Styles for Custom Variable Popup --- */
+    .custom-var-popup {
+        background: linear-gradient(97deg,#eaf3ff 65%,#fafdff 100%);
+        border: 1.5px solid #b3d1fa;
+        border-radius: 16px;
+        box-shadow: 0 4px 22px #83befc33;
+        width: 345px;
+        max-width: 95vw;
+        padding: 0 0 16px 0;
+        display: flex;
+        flex-direction: column;
+        animation: fadeInVarPopup .19s;
+    }
+    @keyframes fadeInVarPopup { from { opacity:0; transform: scale(0.98);} to {opacity:1;} }
+    .var-popup-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 18px 18px 7px 18px;
+        border-bottom: 1px solid #dde9f8;
+        font-family: 'Lexend', 'Inter', sans-serif;
+        font-size: 20px;
+        font-weight: 800;
+        color: #2172c9;
+    }
+    .close-var-popup {
+        background: none;
+        border: none;
+        color: #a2b4d7;
+        font-size: 26px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-left: 10px;
+        transition: color .18s;
+    }
+    .close-var-popup:hover { color: #2172c9; }
+    .var-popup-list {
+        display: grid;
+        grid-template-columns: repeat(2,1fr);
+        gap: 11px 12px;
+        padding: 18px 16px 2px 16px;
+    }
+    .var-popup-list button {
+        border: 1.5px solid #b3d1fa;
+        background: #eaf3ff;
+        color: #2276ce;
+        border-radius: 10px;
+        font-family: 'Roboto Mono', monospace;
+        font-size: 15px;
+        font-weight: 600;
+        padding: 9px 0;
+        cursor: pointer;
+        transition: background .13s, color .13s, border-color .13s, transform .1s;
+        box-shadow: 0 1.5px 8px #acd7fa22;
+    }
+    .var-popup-list button:hover {
+        background: #d7eafe;
+        color: #1760a9;
+        border-color: #97c3ee;
+        transform: translateY(-2px) scale(1.05);
+    }
     </style>
     `;
     res.set({ 'Content-Type': 'text/html', 'Content-Disposition': 'inline' }).send(getHtmlTemplate('Add Chat Reply', addReplyForm));
@@ -488,12 +553,12 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         const customVarArr = customVariables.map(v => `%${v.name}%`);
         const defaultVars = [
             "%message%", "%message_LENGTH%", "%capturing_group_ID%", "%name%",
-            "%first_name%", "%last_name%", "%chat_name%", "%last_name%", "%date%", "%time%",
+            "%first_name%", "%last_name%", "%chat_name%", "%date%", "%time%",
             "%hour%", "%minute%", "%second%", "%am/pm%", "%day_of_month%", "%month%", "%year%", "%rule_id%"
         ];
         const allVars = [...defaultVars, ...customVarArr];
         const variableButtonsHTML = allVars.map(v =>
-            `<button style="padding:10px 0;border-radius:9px;border:1.5px solid #e5e6ff;background:#272753;color:#ffd870;font-family:Roboto Mono,monospace;font-size:15px;cursor:pointer;font-weight:600;transition:.15s;" onclick="insertVariable('replies','${v.replace(/'/g,"\\'")}')">${v}</button>`
+            `<button onclick="insertVariable('replies','${v.replace(/'/g,"\\'")}')">${v}</button>`
         ).join('');
         const editReplyForm = `
         <form method="POST" action="/admin/edit-reply/${reply._id}" style="max-width:480px;margin:auto;">
@@ -542,6 +607,9 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             <button type="submit" style="width:100%;margin-top:20px;padding:12px 0;background:#296aff;color:#fff;font-weight:700;font-size:18px;border:none;border-radius:8px;">Update Reply</button>
         </form>
         <script>
+        // Server-side generated HTML for variable buttons
+        window.variableButtonsHTML = \`${variableButtonsHTML}\`;
+
         function showVariablePicker(inputId) {
             let modal = document.getElementById('varPickerModal');
             if (!modal) {
@@ -549,12 +617,14 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 modal.id = 'varPickerModal';
                 modal.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:#19193be3;display:flex;align-items:center;justify-content:center;z-index:5000;";
                 modal.innerHTML = \`
-                  <div style="background:#212245;padding:22px 16px 12px 16px;border-radius:18px;box-shadow:0 8px 36px #000a;width:355px;max-width:94vw;">
-                    <h2 style="color:#ffd870;margin-bottom:12px;text-align:center;font-family:Lexend,Inter,sans-serif;font-size:22px;font-weight:700;letter-spacing:.3px;">Insert Variable</h2>
-                    <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px 10px;margin-bottom:16px;">
-                      ${variableButtonsHTML}
+                  <div class="custom-var-popup">
+                    <div class="var-popup-header">
+                        <span>Insert Variable</span>
+                        <button onclick="document.getElementById('varPickerModal').remove()" class="close-var-popup">×</button>
                     </div>
-                    <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:8px 30px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:17px;display:block;margin:auto;">Close</button>
+                    <div class="var-popup-list">
+                        \${window.variableButtonsHTML || ''}
+                    </div>
                   </div>
                 \`;
                 document.body.appendChild(modal);
@@ -606,6 +676,67 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             color: #212245;  
             margin-bottom: 5px;  
             display: block;  
+        }
+        /* --- Styles for Custom Variable Popup --- */
+        .custom-var-popup {
+            background: linear-gradient(97deg,#eaf3ff 65%,#fafdff 100%);
+            border: 1.5px solid #b3d1fa;
+            border-radius: 16px;
+            box-shadow: 0 4px 22px #83befc33;
+            width: 345px;
+            max-width: 95vw;
+            padding: 0 0 16px 0;
+            display: flex;
+            flex-direction: column;
+            animation: fadeInVarPopup .19s;
+        }
+        @keyframes fadeInVarPopup { from { opacity:0; transform: scale(0.98);} to {opacity:1;} }
+        .var-popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 18px 7px 18px;
+            border-bottom: 1px solid #dde9f8;
+            font-family: 'Lexend', 'Inter', sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            color: #2172c9;
+        }
+        .close-var-popup {
+            background: none;
+            border: none;
+            color: #a2b4d7;
+            font-size: 26px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: color .18s;
+        }
+        .close-var-popup:hover { color: #2172c9; }
+        .var-popup-list {
+            display: grid;
+            grid-template-columns: repeat(2,1fr);
+            gap: 11px 12px;
+            padding: 18px 16px 2px 16px;
+        }
+        .var-popup-list button {
+            border: 1.5px solid #b3d1fa;
+            background: #eaf3ff;
+            color: #2276ce;
+            border-radius: 10px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 15px;
+            font-weight: 600;
+            padding: 9px 0;
+            cursor: pointer;
+            transition: background .13s, color .13s, border-color .13s, transform .1s;
+            box-shadow: 0 1.5px 8px #acd7fa22;
+        }
+        .var-popup-list button:hover {
+            background: #d7eafe;
+            color: #1760a9;
+            border-color: #97c3ee;
+            transform: translateY(-2px) scale(1.05);
         }
         </style>
         `;
