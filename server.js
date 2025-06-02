@@ -328,14 +328,14 @@ app.get('/admin/logout', (req, res) => {
 
 // -- Add Chat Reply Form
 app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
-    let customVarListHtml = '';
+    // let customVarListHtml = ''; // No longer needed as the small block is removed
     let customVarsJsArray = '[]';
     try {
         const customVariables = await CustomVariable.find({});
-        customVarListHtml = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
-        if (customVarListHtml) {
-            customVarListHtml = `<br>**Custom Variables:** ${customVarListHtml}`;
-        }
+        // customVarListHtml = customVariables.map(v => `<code>%${v.name}%</code>`).join(', '); // No longer needed
+        // if (customVarListHtml) {
+        //     customVarListHtml = `<br>**Custom Variables:** ${customVarListHtml}`; // No longer needed
+        // }
         // Prepare JS array for client-side
         customVarsJsArray = JSON.stringify(customVariables.map(v => `%${v.name}%`));
     } catch (e) {
@@ -373,22 +373,24 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <div style="display: flex; align-items: center; gap: 6px;">
           <textarea name="replies" id="replies" required style="flex: 1"></textarea>
-          <button type="button" id="insertVarBtn" title="Insert Variable" style="padding: 7px 10px; border-radius:7px; border:none; background:#e7e1fa; cursor:pointer;">
-            <svg width="20" height="20" stroke="#7d38a8" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="4" width="16" height="12" rx="4" />
-              <path d="M8 9v2" />
-              <path d="M12 9v2" />
+          <button type="button" id="insertVarBtn" title="Insert Variable" style="
+              padding: 0;
+              height: 28px; width: 28px;
+              border-radius: 8px;
+              border: none;
+              background: #f3eaff;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 2px 8px #cac6eb55;
+          ">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7d38a8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
+              <polyline points="3 8 12 13 21 8"/>
             </svg>
           </button>
         </div>
-        <small>
-            **Available replacements:**<br>
-            **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
-            **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
-            **Date & Time:** %date%, %time%, %hour%, %minute%, %second%, %am/pm%, %day_of_month%, %month%, %year%<br>
-            **AutoResponder:** %rule_id%<br>
-            ${customVarListHtml}
-        </small>
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="0" />
         <div id="isDefaultField" style="display:none;">
@@ -402,13 +404,13 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     </form>
 
     <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center;">
-      <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:270px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
-        <div style="font-size:20px; font-weight:700; margin-bottom:12px; color:#7d38a8;">Insert Variable</div>
-        <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:7px 12px;margin-bottom:14px;font-size:16px;border:1.2px solid #ddd;border-radius:6px;">
-        <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:240px; overflow:auto;">
+      <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:240px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
+        <div style="font-size:18px; font-weight:600; margin-bottom:10px; color:#7d38a8;">Variables</div>
+        <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:6px 10px;margin-bottom:12px;font-size:15px;border:1.2px solid #eee;border-radius:6px;">
+        <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:180px; overflow:auto;">
           </ul>
-        <div style="margin-top:18px; text-align:right;">
-          <button id="varCloseBtn" style="padding:8px 19px; background:#f7f3ff; border-radius:7px; border:none; color:#a654eb; font-weight:600; font-size:16px; cursor:pointer;">Cancel</button>
+        <div style="margin-top:14px; text-align:right;">
+          <button id="varCloseBtn" style="padding:7px 16px; background:#f7f3ff; border-radius:7px; border:none; color:#a654eb; font-weight:600; font-size:15px; cursor:pointer;">Cancel</button>
         </div>
       </div>
     </div>
@@ -693,14 +695,14 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         if (!reply) {
             return res.status(404).set('Content-Type', 'text/html').send(getHtmlTemplate('Not Found', '<p>Reply not found.</p><br><a href="/admin/reply-list">Back to List</a>'));
         }
-        let customVarListHtml = '';
+        // let customVarListHtml = ''; // No longer needed
         let customVarsJsArray = '[]';
         try {
             const customVariables = await CustomVariable.find({});
-            customVarListHtml = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
-            if (customVarListHtml) {
-                customVarListHtml = `<br>**Custom Variables:** ${customVarListHtml}`;
-            }
+            // customVarListHtml = customVariables.map(v => `<code>%${v.name}%</code>`).join(', '); // No longer needed
+            // if (customVarListHtml) {
+            //     customVarListHtml = `<br>**Custom Variables:** ${customVarListHtml}`; // No longer needed
+            // }
             // Prepare JS array for client-side
             customVarsJsArray = JSON.stringify(customVariables.map(v => `%${v.name}%`));
         } catch (e) { console.error("Error fetching custom variables for form:", e); }
@@ -735,22 +737,24 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             <label for="replies">Replies (use &lt;#&gt; between lines):</label>
             <div style="display: flex; align-items: center; gap: 6px;">
               <textarea name="replies" id="replies" required style="flex: 1">${reply.replies.join('<#>')}</textarea>
-              <button type="button" id="insertVarBtn" title="Insert Variable" style="padding: 7px 10px; border-radius:7px; border:none; background:#e7e1fa; cursor:pointer;">
-                <svg width="20" height="20" stroke="#7d38a8" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="4" width="16" height="12" rx="4" />
-                  <path d="M8 9v2" />
-                  <path d="M12 9v2" />
+              <button type="button" id="insertVarBtn" title="Insert Variable" style="
+                  padding: 0;
+                  height: 28px; width: 28px;
+                  border-radius: 8px;
+                  border: none;
+                  background: #f3eaff;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  box-shadow: 0 2px 8px #cac6eb55;
+              ">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7d38a8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
+                  <polyline points="3 8 12 13 21 8"/>
                 </svg>
               </button>
             </div>
-            <small>
-                **Available replacements:**<br>
-                **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
-                **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
-                **Date & Time:** %date%, %time%, %hour%, %minute%, %second%, %am/pm%, %day_of_month%, %month%, %year%<br>
-                **AutoResponder:** %rule_id%<br>
-                ${customVarListHtml}
-            </small>
             <label for="priority">Priority:</label>
             <input type="number" name="priority" id="priority" value="${reply.priority}" />
             <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
@@ -765,13 +769,13 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         <a href="/admin/reply-list">← Back to List</a>
 
         <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center;">
-          <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:270px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
-            <div style="font-size:20px; font-weight:700; margin-bottom:12px; color:#7d38a8;">Insert Variable</div>
-            <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:7px 12px;margin-bottom:14px;font-size:16px;border:1.2px solid #ddd;border-radius:6px;">
-            <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:240px; overflow:auto;">
+          <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:240px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
+            <div style="font-size:18px; font-weight:600; margin-bottom:10px; color:#7d38a8;">Variables</div>
+            <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:6px 10px;margin-bottom:12px;font-size:15px;border:1.2px solid #eee;border-radius:6px;">
+            <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:180px; overflow:auto;">
               </ul>
-            <div style="margin-top:18px; text-align:right;">
-              <button id="varCloseBtn" style="padding:8px 19px; background:#f7f3ff; border-radius:7px; border:none; color:#a654eb; font-weight:600; font-size:16px; cursor:pointer;">Cancel</button>
+            <div style="margin-top:14px; text-align:right;">
+              <button id="varCloseBtn" style="padding:7px 16px; background:#f7f3ff; border-radius:7px; border:none; color:#a654eb; font-weight:600; font-size:15px; cursor:pointer;">Cancel</button>
             </div>
           </div>
         </div>
@@ -887,7 +891,7 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         res.redirect('/admin/reply-list');
     } catch (error) {
         console.error('Error updating reply:', error);
-        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating reply.</p><br><a href="/admin/edit-reply/' + replyId + '">Back to Edit Reply</a>'));
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating reply.</p><br><a href="/admin/edit-reply/' + replyId + '">Try again</a>'));
     }
 });
 
