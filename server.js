@@ -88,17 +88,34 @@ function getHtmlTemplate(title, bodyContent) {
 }
 const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-// ======= NESTED VARIABLE RESOLVER =========
+// ======= NESTED VARIABLE RESOLVER (TRUE RECURSIVE) =========
 async function resolveVariables(text, customVariables, maxDepth = 8) {
-    let result = text;
-    let depth = 0;
-    // Map for fast lookup
-    const varMap = {};
+    let varMap = {};
     customVariables.forEach(v => { varMap[v.name] = v.value; });
 
-    // Yeh loop karta rahega jab tak variable milte rahenge ya maxDepth nahi ho jata
-    while (depth < maxDepth) {
-        // Pehle ka result save karo
+    // Pehle har variable ki value me bhi replace run kar
+    for (let depth = 0; depth < maxDepth; depth++) {
+        let changed = false;
+        for (let name in varMap) {
+            let oldValue = varMap[name];
+            let newValue = oldValue.replace(/%([a-zA-Z0-9_]+)%/g, (match, vname) => {
+                // Agar value exist karti hai aur khud se refer nahi kar rha
+                if (varMap[vname] !== undefined && vname !== name) {
+                    return varMap[vname];
+                }
+                return match;
+            });
+            if (newValue !== oldValue) {
+                varMap[name] = newValue;
+                changed = true;
+            }
+        }
+        if (!changed) break; // Agar is iteration mein koi change nahi hua, toh aage badhne ki zaroorat nahi
+    }
+
+    // Ab reply text pe bhi nested replace lagao
+    let result = text;
+    for (let depth = 0; depth < maxDepth; depth++) {
         const prev = result;
         result = result.replace(/%([a-zA-Z0-9_]+)%/g, (match, vname) => {
             if (varMap[vname] !== undefined) {
@@ -106,9 +123,7 @@ async function resolveVariables(text, customVariables, maxDepth = 8) {
             }
             return match;
         });
-        // Agar result change hi nahi hua to break
-        if (result === prev) break;
-        depth++;
+        if (result === prev) break; // Agar result change hi nahi hua to break
     }
     return result;
 }
@@ -128,7 +143,7 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
         // --- Custom variable replacement (with recursion for nested) ---
         // Fetch all custom variables from the database
         const customVariables = await CustomVariable.find({});
-        // Resolve all custom variables, including nested ones
+        // Resolve all custom variables, including nested ones, using the new true recursive logic
         replyText = await resolveVariables(replyText, customVariables);
     } catch (error) {
         console.error("Custom variable resolution error:", error);
@@ -598,143 +613,6 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     } catch (error) {
         console.error('Error fetching reply for edit:', error);
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading reply for edit.</p><br><a href="/admin/reply-list">Back to List</a>'));
-    }
-});
-
-app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
-    const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
-    const replyId = req.params.id;
-    if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/edit-reply/' + replyId + '">Back to Edit Reply</a>'));
-    try {
-        if (type === 'default_message' && isDefault === 'true') {
-            await ChatReply.updateMany({ type: 'default_message', _id: { $ne: replyId } }, { isDefault: false });
-        }
-        await ChatReply.findByIdAndUpdate(replyId, {
-            ruleName,
-            type,
-            keyword: keyword || '',
-            pattern: pattern || '',
-            replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
-            priority: parseInt(priority),
-            isDefault: isDefault === 'true',
-            sendMethod: sendMethod || 'random'
-        });
-        res.redirect('/admin/reply-list');
-    } catch (error) {
-        console.error('Error updating reply:', error);
-        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating reply.</p><br><a href="/admin/edit-reply/' + replyId + '">Back to Edit Reply</a>'));
-    }
-});
-
-// ========== DELETE REPLY ==========
-app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
-    try {
-        await ChatReply.findByIdAndDelete(req.params.id);
-        res.redirect('/admin/reply-list');
-    } catch (error) {
-        console.error('Error deleting reply:', error);
-        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error deleting reply.</p><br><a href="/admin/reply-list">Back to List</a>'));
-    }
-});
-
-// ========== CUSTOM VARIABLE CRUD ==========
-// List all custom variables
-app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
-    try {
-        const variables = await CustomVariable.find({});
-        const listItems = variables.map(v => `
-            <div class="custom-var-box">
-                <div class="var-header">
-                    <div class="var-name">%${v.name}%</div>
-                    <div class="var-actions">
-                        <a title="Edit" href="/admin/edit-custom-variable/${v._id}">
-                          <svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
-                        </a>
-                        <a title="Delete" href="/admin/delete-custom-variable/${v._id}" onclick="return confirm('Delete this variable?')">
-                          <svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg>
-                        </a>
-                    </div>
-                </div>
-                <div class="var-value">${v.value.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
-            </div>
-        `).join('');
-        const content = `
-            <h2 style="margin-top:0;">Manage Custom Variables</h2>
-            <div class="custom-var-list">${listItems || '<em>No variables found.</em>'}</div>
-            <a class="btn" href="/admin/add-custom-variable">➕ Add New Variable</a>
-            <a class="btn back" href="/admin/dashboard">← Back to Dashboard</a>
-            <style>
-            .custom-var-list { display: flex; flex-direction: column; gap: 18px; margin: 18px 0 30px 0; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; }
-            .custom-var-box { background: linear-gradient(95deg, #fff, #f2e6ff 60%); border: 1.5px solid #c7b0fa; border-radius: 14px; box-shadow: 0 2px 12px #b785fa22; padding: 14px 22px 10px 22px; position: relative; transition: box-shadow 0.18s; width: 100%; min-height: 85px; display: flex; flex-direction: column; justify-content: flex-start; box-sizing: border-box; }
-            .custom-var-box:hover { box-shadow: 0 4px 18px #bb6ffa33; }
-            .var-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 18px; }
-            .var-name { font-family: 'Lexend', 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: #7339b3; word-break: break-all; }
-            .var-actions a { display: inline-flex; align-items: center; color: #656565; margin-left: 10px; opacity: 0.82; transition: color 0.18s, opacity 0.12s; }
-            .var-actions a:hover { color: #9e2cff; opacity: 1; }
-            .var-actions svg { vertical-align: middle; margin-bottom: 1.5px; }
-            .var-value { font-family: 'Roboto Mono', monospace; font-size: 15px; color: #272b34; max-height: 52px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; background: #f8f6fa; border-radius: 8px; padding: 9px 14px; margin-bottom: 2px; word-break: break-all; width: 100%; min-height: 34px; box-sizing: border-box; display: block; }
-            </style>
-        `;
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Manage Custom Variables', content));
-    } catch (error) {
-        console.error('Error listing custom variables:', error);
-        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading custom variables.</p>'));
-    }
-});
-
-// Add custom variable form
-app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
-    const form = `
-        <h2>Add New Custom Variable</h2>
-        <form method="POST" action="/admin/add-custom-variable">
-            <label for="name">Variable Name (e.g., my_city, admin_email):</label>
-            <input name="name" id="name" placeholder="Should be unique, no spaces, e.g., welcome_greeting" required />
-            <label for="value">Variable Value:</label>
-            <textarea name="value" id="value" placeholder="The actual text this variable will replace." required></textarea>
-            <button type="submit">Add Variable</button>
-        </form>
-        <a href="/admin/custom-variables">← Back to Variables</a>
-    `;
-    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Custom Variable', form));
-});
-app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
-    const { name, value } = req.body;
-    try {
-        const newVariable = new CustomVariable({ name: name.trim(), value });
-        await newVariable.save();
-        res.redirect('/admin/custom-variables');
-    } catch (error) {
-        console.error('Error adding custom variable:', error);
-        let errorMessage = 'Error adding custom variable.';
-        if (error.code === 11000) {
-            errorMessage = `Variable name '%${name}%' already exists. Please choose a different name.`;
-        }
-        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>${errorMessage}</p><br><a href="/admin/add-custom-variable">Try again</a>`));
-    }
-});
-
-// Edit custom variable form
-app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
-    try {
-        const variable = await CustomVariable.findById(req.params.id);
-        if (!variable) {
-            return res.status(404).set('Content-Type', 'text/html').send(getHtmlTemplate('Not Found', '<p>Variable not found.</p><br><a href="/admin/custom-variables">Back to List</a>'));
-        }
-        const form = `
-            <h2>Edit Custom Variable</h2>
-            <form method="POST" action="/admin/edit-custom-variable/${variable._id}">
-                <label for="name">Variable Name:</label>
-                <input name="name" id="name" value="${variable.name}" readonly />
-                <label for="value">Variable Value:</label>
-                <textarea name="value" id="value" required>${variable.value}</textarea>
-                <button type="submit">Update Variable</button>
-            </form>
-            <a href="/admin/custom-variables">← Back to Variables</a>
-        `;
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Custom Variable', form));
-    } catch (error) {
-        console.error('Error fetching custom variable for edit:', error);
-        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading variable for edit.</p><br><a href="/admin/custom-variables">Back to List</a>'));
     }
 });
 
