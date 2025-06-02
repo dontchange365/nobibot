@@ -238,115 +238,128 @@ app.get('/admin/logout', (req, res) => { req.session.destroy(() => res.redirect(
 // ---- Add Chat Reply FORM with DYNAMIC Variables PICKER ----
 app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     // --- GET custom variables for JS inject ---
-    const customVariables = await CustomVariable.find({});
-    const customVarArr = customVariables.map(v => `%${v.name}%`);
-    const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
+    // In /admin/add-chat-replies GET route:
+const customVariables = await CustomVariable.find({});
+const customVarArr = customVariables.map(v => `%${v.name}%`);
+const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
 
-    const addReplyForm = `
-    <form method="POST" action="/admin/add-chat-replies">
-        <label for="ruleName">Rule Name:</label>
-        <input name="ruleName" id="ruleName" placeholder="e.g. Greet User" required />
-        <label for="sendMethod">Send Method:</label>
-        <select name="sendMethod" id="sendMethod">
-            <option value="random">Random</option>
-            <option value="all">All</option>
-            <option value="once">Once (first one)</option>
+const addReplyForm = `
+<form method="POST" action="/admin/add-chat-replies" style="max-width:480px;margin:auto;">
+    <label for="ruleName"><b>Rule Name:</b></label>
+    <input name="ruleName" id="ruleName" placeholder="e.g. Greet User" required />
+    <label for="sendMethod"><b>Send Method:</b></label>
+    <select name="sendMethod" id="sendMethod">
+        <option value="random">Random</option>
+        <option value="all">All</option>
+        <option value="once">Once (first one)</option>
+    </select>
+    <h2 style="text-align:center;margin:18px 0 5px 0;">Add Chat Reply</h2>
+    <label for="type"><b>Type:</b></label>
+    <select name="type" id="type" required onchange="handleTypeChange()">
+        <option value="">--Select Type--</option>
+        <option value="exact_match">Exact Match</option>
+        <option value="pattern_matching">Pattern Matching</option>
+        <option value="expert_pattern_matching">Expert Regex</option>
+        <option value="welcome_message">Welcome Message</option>
+        <option value="default_message">Default Message</option>
+    </select>
+    <div id="keywordField" style="display:none;">
+        <label for="keyword"><b>Keyword(s):</b></label>
+        <input name="keyword" id="keyword" placeholder="e.g. hi, hello" />
+    </div>
+    <div id="patternField" style="display:none;">
+        <label for="pattern"><b>Regex Pattern:</b></label>
+        <input name="pattern" id="pattern" placeholder="Expert Regex. Use () for capturing groups." />
+    </div>
+    <label for="replies"><b>Replies (use &lt;#&gt; between lines):</b></label>
+    <div style="display:flex;align-items:stretch;gap:6px;">
+        <button type="button" title="Insert Variable" onclick="showVariablePicker('replies')" style="height:40px;width:40px;display:flex;align-items:center;justify-content:center;background:#1a1a3c;border:none;border-radius:7px;margin-right:4px;cursor:pointer;">
+            <svg width="23" height="23" stroke="#ffd870" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </button>
+        <textarea name="replies" id="replies" required style="flex:1;min-height:90px;font-size:16px;padding:8px;border-radius:8px;border:1.5px solid #b6b6d1;resize:vertical;"></textarea>
+    </div>
+    <label for="priority" style="margin-top:14px;"><b>Priority:</b></label>
+    <input type="number" name="priority" id="priority" value="0" />
+    <div id="isDefaultField" style="display:none;">
+        <label for="isDefault">Is Default?</label>
+        <select name="isDefault" id="isDefault">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
         </select>
-        <h2>Add Chat Reply</h2>
-        <label for="type">Type:</label>
-        <select name="type" id="type" required onchange="handleTypeChange()">
-            <option value="">--Select Type--</option>
-            <option value="exact_match">Exact Match</option>
-            <option value="pattern_matching">Pattern Matching</option>
-            <option value="expert_pattern_matching">Expert Regex</option>
-            <option value="welcome_message">Welcome Message</option>
-            <option value="default_message">Default Message</option>
-        </select>
-        <div id="keywordField" style="display:none;">
-            <label for="keyword">Keyword(s):</label>
-            <input name="keyword" id="keyword" placeholder="e.g. hi, hello" />
-        </div>
-        <div id="patternField" style="display:none;">
-            <label for="pattern">Regex Pattern:</label>
-            <input name="pattern" id="pattern" placeholder="Only for Expert Regex. Use () for capturing groups." />
-        </div>
-        <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-        <div style="display:flex;align-items:center;gap:7px;">
-            <textarea name="replies" id="replies" required style="flex:1;"></textarea>
-            <button type="button" title="Insert Variable" onclick="showVariablePicker('replies')" style="background:#252e51;border:none;padding:7px 8px 4px 8px;border-radius:7px;cursor:pointer;display:flex;align-items:center;">
-                <svg width="23" height="23" stroke="#ffd870" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            </button>
-        </div>
-        <label for="priority">Priority:</label>
-        <input type="number" name="priority" id="priority" value="0" />
-        <div id="isDefaultField" style="display:none;">
-            <label for="isDefault">Is Default?</label>
-            <select name="isDefault" id="isDefault">
-                <option value="false">No</option>
-                <option value="true">Yes</option>
-            </select>
-        </div>
-        <button type="submit" style="margin-top:15px;">Add Reply</button>
-    </form>
-    <script>
-    const availableVars = [
-      "%message%", "%message_LENGTH%", "%capturing_group_ID%",
-      "%name%", "%first_name%", "%last_name%", "%chat_name%",
-      "%date%", "%time%", "%hour%", "%minute%", "%second%", "%am/pm%",
-      "%day_of_month%", "%month%", "%year%", "%rule_id%"
-    ];
-    if (window.customVarListArr) availableVars.push(...window.customVarListArr);
+    </div>
+    <button type="submit" style="width:100%;margin-top:20px;padding:12px 0;background:#296aff;color:#fff;font-weight:700;font-size:18px;border:none;border-radius:8px;">Add Reply</button>
+</form>
+${customVarScript}
+<script>
+const defaultVars = [
+    "%message%", "%message_LENGTH%", "%capturing_group_ID%", "%name%",
+    "%first_name%", "%last_name%", "%chat_name%", "%last_name%", "%date%", "%time%",
+    "%hour%", "%minute%", "%second%", "%am/pm%", "%day_of_month%", "%month%", "%year%", "%rule_id%"
+];
+const allVars = [...defaultVars, ...(window.customVarListArr || [])];
 
-    function showVariablePicker(inputId) {
-      let modal = document.getElementById('varPickerModal');
-      if (!modal) {
+// Picker
+function showVariablePicker(inputId) {
+    let modal = document.getElementById('varPickerModal');
+    if (!modal) {
         modal = document.createElement('div');
         modal.id = 'varPickerModal';
-        modal.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0008;display:flex;align-items:center;justify-content:center;z-index:5000;";
+        modal.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:#19193be3;display:flex;align-items:center;justify-content:center;z-index:5000;";
         modal.innerHTML = \`
-          <div style="background:#181d2f;padding:20px 20px 10px 20px;border-radius:14px;box-shadow:0 8px 32px #000a;width:340px;max-width:94vw;">
-            <h3 style="color:#fff;margin-bottom:10px;font-family:Lexend,Inter,sans-serif;font-size:20px;font-weight:700;letter-spacing:.5px;">Insert Variable</h3>
-            <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px 10px;margin-bottom:16px;">
-              \${availableVars.map(v => \`<button style="padding:6px 10px;border-radius:7px;border:1.5px solid #5b8dff;background:#252e51;color:#ffd870;font-family:Roboto Mono,monospace;font-size:14px;cursor:pointer;" onclick="insertVariable('\${inputId}','\${v.replace(/'/g,"\\\\'")}')">\${v}</button>\`).join('')}
+          <div style="background:#212245;padding:22px 16px 12px 16px;border-radius:18px;box-shadow:0 8px 36px #000a;width:355px;max-width:94vw;">
+            <h2 style="color:#ffd870;margin-bottom:12px;text-align:center;font-family:Lexend,Inter,sans-serif;font-size:22px;font-weight:700;letter-spacing:.3px;">Insert Variable</h2>
+            <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px 10px;margin-bottom:16px;">
+              ${allVars.map(v => `<button style="padding:10px 0;border-radius:9px;border:1.5px solid #e5e6ff;background:#272753;color:#ffd870;font-family:Roboto Mono,monospace;font-size:15px;cursor:pointer;font-weight:600;transition:.15s;" onclick="insertVariable('${inputId}','${v.replace(/'/g,"\\\\'")}')">${v}</button>`).join('')}
             </div>
-            <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:7px 18px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:15px;float:right;">Close</button>
+            <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:8px 30px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:17px;display:block;margin:auto;">Close</button>
           </div>
         \`;
         document.body.appendChild(modal);
-      }
     }
-    function insertVariable(inputId, value) {
-      const el = document.getElementById(inputId);
-      if (el) {
+}
+
+function insertVariable(inputId, value) {
+    const el = document.getElementById(inputId);
+    if (el) {
         const start = el.selectionStart;
         const end = el.selectionEnd;
         el.value = el.value.substring(0, start) + value + el.value.substring(end);
         el.focus();
         el.selectionStart = el.selectionEnd = start + value.length;
-      }
-      document.getElementById('varPickerModal')?.remove();
     }
-    function handleTypeChange() {
-        const type = document.getElementById('type').value;
-        const keywordField = document.getElementById('keywordField');
-        const patternField = document.getElementById('patternField');
-        const isDefaultField = document.getElementById('isDefaultField');
-        keywordField.style.display = 'none';
-        patternField.style.display = 'none';
-        isDefaultField.style.display = 'none';
-        if (type === 'exact_match' || type === 'pattern_matching') keywordField.style.display = 'block';
-        if (type === 'expert_pattern_matching') patternField.style.display = 'block';
-        if (type === 'default_message') isDefaultField.style.display = 'block';
-    }
-    document.addEventListener('DOMContentLoaded', handleTypeChange);
-    </script>
-    ${customVarScript}
-    `;
-    res.set({
-        'Content-Type': 'text/html',
-        'Content-Disposition': 'inline'
-    }).send(getHtmlTemplate('Add Chat Reply', addReplyForm));
-});
+    document.getElementById('varPickerModal')?.remove();
+}
+function handleTypeChange() {
+    const type = document.getElementById('type').value;
+    const keywordField = document.getElementById('keywordField');
+    const patternField = document.getElementById('patternField');
+    const isDefaultField = document.getElementById('isDefaultField');
+    keywordField.style.display = 'none';
+    patternField.style.display = 'none';
+    isDefaultField.style.display = 'none';
+    if (type === 'exact_match' || type === 'pattern_matching') keywordField.style.display = 'block';
+    if (type === 'expert_pattern_matching') patternField.style.display = 'block';
+    if (type === 'default_message') isDefaultField.style.display = 'block';
+}
+</script>
+<style>
+input, textarea, select {
+    width: 100%;
+    margin-bottom: 14px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: 1.5px solid #b6b6d1;
+    padding: 8px 12px;
+    background: #f8f8fd;
+    color: #202050;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+}
+input:focus, textarea:focus, select:focus { border-color: #367aff; background: #f4f8ff;}
+label { font-weight: 600; color: #212245; margin-bottom: 5px; display:block; }
+</style>
+`;
+res.set({ 'Content-Type': 'text/html', 'Content-Disposition': 'inline' }).send(getHtmlTemplate('Add Chat Reply', addReplyForm));
 
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
@@ -466,110 +479,57 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         }
         // Inject custom variables for JS
         const customVariables = await CustomVariable.find({});
-        const customVarArr = customVariables.map(v => `%${v.name}%`);
-        const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
-
-        const editReplyForm = `
-        <form method="POST" action="/admin/edit-reply/${reply._id}">
-            <label for="ruleName">Rule Name:</label>
-            <input name="ruleName" id="ruleName" value="${reply.ruleName}" required />
-            <label for="sendMethod">Send Method:</label>
-            <select name="sendMethod" id="sendMethod">
-                <option value="random" ${reply.sendMethod === 'random' ? 'selected' : ''}>Random</option>
-                <option value="all" ${reply.sendMethod === 'all' ? 'selected' : ''}>All</option>
-                <option value="once" ${reply.sendMethod === 'once' ? 'selected' : ''}>Once (first one)</option>
-            </select>
-            <h2>Edit Chat Reply</h2>
-            <label for="type">Type:</label>
-            <select name="type" id="type" required onchange="handleTypeChange()">
-                <option value="exact_match" ${reply.type === 'exact_match' ? 'selected' : ''}>Exact Match</option>
-                <option value="pattern_matching" ${reply.type === 'pattern_matching' ? 'selected' : ''}>Pattern Matching</option>
-                <option value="expert_pattern_matching" ${reply.type === 'expert_pattern_matching' ? 'selected' : ''}>Expert Regex</option>
-                <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
-                <option value="default_message" ${reply.type === 'default_message' ? 'selected' : ''}>Default Message</option>
-            </select>
-            <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
-                <label for="keyword">Keyword(s):</label>
-                <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
-            </div>
-            <div id="patternField" style="${reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
-                <label for="pattern">Regex Pattern:</label>
-                <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Only for Expert Regex. Use () for capturing groups." />
-            </div>
-            <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-            <div style="display:flex;align-items:center;gap:7px;">
-                <textarea name="replies" id="replies" required style="flex:1;">${reply.replies.join('<#>')}</textarea>
-                <button type="button" title="Insert Variable" onclick="showVariablePicker('replies')" style="background:#252e51;border:none;padding:7px 8px 4px 8px;border-radius:7px;cursor:pointer;display:flex;align-items:center;">
-                    <svg width="23" height="23" stroke="#ffd870" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                </button>
-            </div>
-            <label for="priority">Priority:</label>
-            <input type="number" name="priority" id="priority" value="${reply.priority}" />
-            <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
-                <label for="isDefault">Is Default?</label>
-                <select name="isDefault" id="isDefault">
-                    <option value="false" ${!reply.isDefault ? 'selected' : ''}>No</option>
-                    <option value="true" ${reply.isDefault ? 'selected' : ''}>Yes</option>
-                </select>
-            </div>
-            <button type="submit" style="margin-top:15px;">Update Reply</button>
-        </form>
-        <a href="/admin/reply-list">← Back to List</a>
-        <script>
-        const availableVars = [
-          "%message%", "%message_LENGTH%", "%capturing_group_ID%",
-          "%name%", "%first_name%", "%last_name%", "%chat_name%",
-          "%date%", "%time%", "%hour%", "%minute%", "%second%", "%am/pm%",
-          "%day_of_month%", "%month%", "%year%", "%rule_id%"
-        ];
-        if (window.customVarListArr) availableVars.push(...window.customVarListArr);
-
-        function showVariablePicker(inputId) {
-          let modal = document.getElementById('varPickerModal');
-          if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'varPickerModal';
-            modal.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0008;display:flex;align-items:center;justify-content:center;z-index:5000;";
-            modal.innerHTML = \`
-              <div style="background:#181d2f;padding:20px 20px 10px 20px;border-radius:14px;box-shadow:0 8px 32px #000a;width:340px;max-width:94vw;">
-                <h3 style="color:#fff;margin-bottom:10px;font-family:Lexend,Inter,sans-serif;font-size:20px;font-weight:700;letter-spacing:.5px;">Insert Variable</h3>
-                <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px 10px;margin-bottom:16px;">
-                  \${availableVars.map(v => \`<button style="padding:6px 10px;border-radius:7px;border:1.5px solid #5b8dff;background:#252e51;color:#ffd870;font-family:Roboto Mono,monospace;font-size:14px;cursor:pointer;" onclick="insertVariable('\${inputId}','\${v.replace(/'/g,"\\\\'")}')">\${v}</button>\`).join('')}
-                </div>
-                <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:7px 18px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:15px;float:right;">Close</button>
-              </div>
-            \`;
-            document.body.appendChild(modal);
-          }
-        }
-        function insertVariable(inputId, value) {
-          const el = document.getElementById(inputId);
-          if (el) {
-            const start = el.selectionStart;
-            const end = el.selectionEnd;
-            el.value = el.value.substring(0, start) + value + el.value.substring(end);
-            el.focus();
-            el.selectionStart = el.selectionEnd = start + value.length;
-          }
-          document.getElementById('varPickerModal')?.remove();
-        }
-        function handleTypeChange() {
-            const type = document.getElementById('type').value;
-            const keywordField = document.getElementById('keywordField');
-            const patternField = document.getElementById('patternField');
-            const isDefaultField = document.getElementById('isDefaultField');
-            keywordField.style.display = 'none';
-            patternField.style.display = 'none';
-            isDefaultField.style.display = 'none';
-            if (type === 'exact_match' || type === 'pattern_matching') keywordField.style.display = 'block';
-            if (type === 'expert_pattern_matching') patternField.style.display = 'block';
-            if (type === 'default_message') isDefaultField.style.display = 'block';
-        }
-        document.addEventListener('DOMContentLoaded', handleTypeChange);
-        </script>
-        ${customVarScript}
-        `;
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
+const customVarArr = customVariables.map(v => `%${v.name}%`);
+const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
+const editReplyForm = `
+<form method="POST" action="/admin/edit-reply/${reply._id}" style="max-width:480px;margin:auto;">
+    <label for="ruleName"><b>Rule Name:</b></label>
+    <input name="ruleName" id="ruleName" value="${reply.ruleName || ''}" required />
+    <label for="sendMethod"><b>Send Method:</b></label>
+    <select name="sendMethod" id="sendMethod">
+        <option value="random" ${reply.sendMethod === 'random' ? 'selected' : ''}>Random</option>
+        <option value="all" ${reply.sendMethod === 'all' ? 'selected' : ''}>All</option>
+        <option value="once" ${reply.sendMethod === 'once' ? 'selected' : ''}>Once (first one)</option>
+    </select>
+    <h2 style="text-align:center;margin:18px 0 5px 0;">Edit Chat Reply</h2>
+    <label for="type"><b>Type:</b></label>
+    <select name="type" id="type" required onchange="handleTypeChange()">
+        <option value="">--Select Type--</option>
+        <option value="exact_match" ${reply.type === 'exact_match' ? 'selected' : ''}>Exact Match</option>
+        <option value="pattern_matching" ${reply.type === 'pattern_matching' ? 'selected' : ''}>Pattern Matching</option>
+        <option value="expert_pattern_matching" ${reply.type === 'expert_pattern_matching' ? 'selected' : ''}>Expert Regex</option>
+        <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
+        <option value="default_message" ${reply.type === 'default_message' ? 'selected' : ''}>Default Message</option>
+    </select>
+    <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
+        <label for="keyword"><b>Keyword(s):</b></label>
+        <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
+    </div>
+    <div id="patternField" style="${reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
+        <label for="pattern"><b>Regex Pattern:</b></label>
+        <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Expert Regex. Use () for capturing groups." />
+    </div>
+    <label for="replies"><b>Replies (use &lt;#&gt; between lines):</b></label>
+    <div style="display:flex;align-items:stretch;gap:6px;">
+        <button type="button" title="Insert Variable" onclick="showVariablePicker('replies')" style="height:40px;width:40px;display:flex;align-items:center;justify-content:center;background:#1a1a3c;border:none;border-radius:7px;margin-right:4px;cursor:pointer;">
+            <svg width="23" height="23" stroke="#ffd870" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </button>
+        <textarea name="replies" id="replies" required style="flex:1;min-height:90px;font-size:16px;padding:8px;border-radius:8px;border:1.5px solid #b6b6d1;resize:vertical;">${reply.replies.join('<#>')}</textarea>
+    </div>
+    <label for="priority" style="margin-top:14px;"><b>Priority:</b></label>
+    <input type="number" name="priority" id="priority" value="${reply.priority}" />
+    <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
+        <label for="isDefault">Is Default?</label>
+        <select name="isDefault" id="isDefault">
+            <option value="false" ${!reply.isDefault ? 'selected' : ''}>No</option>
+            <option value="true" ${reply.isDefault ? 'selected' : ''}>Yes</option>
+        </select>
+    </div>
+    <button type="submit" style="width:100%;margin-top:20px;padding:12px 0;background:#296aff;color:#fff;font-weight:700;font-size:18px;border:none;border-radius:8px;">Update Reply</button>
+</form>
+${customVarScript}
+${getVariablePickerScript()}
+`;
     } catch (error) {
         console.error('Error fetching reply for edit:', error);
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading reply for edit.</p><br><a href="/admin/reply-list">Back to List</a>'));
