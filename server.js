@@ -702,6 +702,7 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
             <div class="custom-var-list">${listItems || '<em>No variables found.</em>'}</div>
             <a class="btn" href="/admin/add-custom-variable">➕ Add New Variable</a>
             <a class="btn back" href="/admin/dashboard">← Back to Dashboard</a>
+            <style>
             .custom-var-list {
     display: flex;
     flex-direction: column;
@@ -781,6 +782,7 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
     /* NEW: Always expand to parent width */
     display: block;
 }
+</style>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Manage Custom Variables', content));
     } catch (error) {
