@@ -1647,6 +1647,7 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
             @media (max-width:600px){.edit-var-panel{max-width:98vw;}.edit-var-form{padding:18px 7px 15px 7px;}}
             /* Common top-bar style for edit forms */
             .top-bar .lucide { width: 20px; height: 20px; }
+            }
         </style>
         `;
     }
