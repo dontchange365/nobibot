@@ -913,38 +913,44 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
 });
 
 // GET: Add new variable form
-app.get('/admin/add-variable', isAuthenticated, (req, res) => {
-    const addVariableForm = `
-    <form method="POST" action="/admin/add-variable">
-        <h2>Add New Custom Variable</h2>
-        <label for="name">Variable Name:</label>
-        <input name="name" id="name" placeholder="e.g. product_name" required />
+app.get('/admin/add-variable', isAuthenticated, async (req, res) => {
+    try {
+        const variables = await CustomVariable.find({});
+        const addVariableForm = `
+        <form method="POST" action="/admin/add-variable">
+            <h2>Add New Custom Variable</h2>
+            <label for="name">Variable Name:</label>
+            <input name="name" id="name" placeholder="e.g. product_name" required />
 
-        <label for="value">Variable Value:</label>
-        <textarea name="value" id="value" required></textarea>
+            <label for="value">Variable Value:</label>
+            <textarea name="value" id="value" required></textarea>
 
-        <button type="button" onclick="toggleVariableList()">🧠 Show Existing Variables</button>
-        <ul id="existingVars" style="display:none; padding: 10px; margin-top: 10px; border: 1px solid #ccc; background: #f9f9f9;">
-            ${variables.map(v => `<li style="cursor:pointer;" onclick="fillVariable('${v.value.replace(/'/g, "\\'")}')"><code>%${v.name}%</code>: ${v.value}</li>`).join('')}
-        </ul>
+            <button type="button" onclick="toggleVariableList()">🧠 Show Existing Variables</button>
+            <ul id="existingVars" style="display:none; padding: 10px; margin-top: 10px; border: 1px solid #ccc; background: #f9f9f9;">
+                ${variables.map(v => `<li style="cursor:pointer;" onclick="fillVariable('${v.value.replace(/'/g, "\\'")}')"><code>%${v.name}%</code>: ${v.value}</li>`).join('')}
+            </ul>
 
-        <br><br><button type="submit">Add Variable</button>
-    </form>
+            <br><br><button type="submit">Add Variable</button>
+        </form>
 
-    <script>
-    function toggleVariableList() {
-        const list = document.getElementById('existingVars');
-        list.style.display = list.style.display === 'none' ? 'block' : 'none';
+        <script>
+        function toggleVariableList() {
+            const list = document.getElementById('existingVars');
+            list.style.display = list.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function fillVariable(val) {
+            document.getElementById('value').value = val;
+        }
+        </script>
+        <br>
+        <a href="/admin/custom-variables">← Back to Custom Variables</a>
+        `;
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Variable', addVariableForm));
+    } catch (error) {
+        console.error("Add Variable Load Error:", error);
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading form</p><a href="/admin/dashboard">Back</a>'));
     }
-
-    function fillVariable(val) {
-        document.getElementById('value').value = val;
-    }
-    </script>
-    <br>
-    <a href="/admin/custom-variables">← Back to Custom Variables</a>
-`;
-    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Variable', addVariableForm));
 });
 
 // POST: Handle adding new variable
