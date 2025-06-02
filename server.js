@@ -303,14 +303,6 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         </div>
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
         <textarea name="replies" id="replies" required></textarea>
-        <small>
-            **Available replacements:**<br>
-            **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
-            **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
-            **Date & Time:** %date%, %time%, %hour%, %minute%, %second%, %am/pm%, %day_of_month%, %month%, %year%<br>
-            **AutoResponder:** %rule_id%<br>
-            ${customVarList}
-        </small>
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="0" />
         <div id="isDefaultField" style="display:none;">
@@ -577,14 +569,6 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             </div>
             <label for="replies">Replies (use &lt;#&gt; between lines):</label>
             <textarea name="replies" id="replies" required>${reply.replies.join('<#>')}</textarea>
-            <small>
-                **Available replacements:**<br>
-                **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
-                **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
-                **Date & Time:** %date%, %time%, %hour%, %minute%, %second%, %am/pm%, %day_of_month%, %month%, %year%<br>
-                **AutoResponder:** %rule_id%<br>
-                ${customVarList}
-            </small>
             <label for="priority">Priority:</label>
             <input type="number" name="priority" id="priority" value="${reply.priority}" />
             <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
