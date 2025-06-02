@@ -303,7 +303,7 @@ function showVariablePicker(inputId) {
           <div style="background:#212245;padding:22px 16px 12px 16px;border-radius:18px;box-shadow:0 8px 36px #000a;width:355px;max-width:94vw;">
             <h2 style="color:#ffd870;margin-bottom:12px;text-align:center;font-family:Lexend,Inter,sans-serif;font-size:22px;font-weight:700;letter-spacing:.3px;">Insert Variable</h2>
             <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px 10px;margin-bottom:16px;">
-              ${allVars.map(v => `<button style="padding:10px 0;border-radius:9px;border:1.5px solid #e5e6ff;background:#272753;color:#ffd870;font-family:Roboto Mono,monospace;font-size:15px;cursor:pointer;font-weight:600;transition:.15s;" onclick="insertVariable('${inputId}','${v.replace(/'/g,"\\\\'")}')">${v}</button>`).join('')}
+              <div id="pickerList"></div>
             </div>
             <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:8px 30px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:17px;display:block;margin:auto;">Close</button>
           </div>
@@ -542,8 +542,7 @@ function showVariablePicker(inputId) {
           <div style="background:#212245;padding:22px 16px 12px 16px;border-radius:18px;box-shadow:0 8px 36px #000a;width:355px;max-width:94vw;">
             <h2 style="color:#ffd870;margin-bottom:12px;text-align:center;font-family:Lexend,Inter,sans-serif;font-size:22px;font-weight:700;letter-spacing:.3px;">Insert Variable</h2>
             <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px 10px;margin-bottom:16px;">
-              ${allVars.map(v => `<button style="padding:10px 0;border-radius:9px;border:1.5px solid #e5e6ff;background:#272753;color:#ffd870;font-family:Roboto Mono,monospace;font-size:15px;cursor:pointer;font-weight:600;transition:.15s;" onclick="insertVariable('${inputId}','${v.replace(/'/g,"\\\\'")}')">${v}</button>`).join('')}
-            </div>
+              <div id="pickerList"></div>
             <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:8px 30px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:17px;display:block;margin:auto;">Close</button>
           </div>
         \`;
