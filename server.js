@@ -87,7 +87,6 @@ function getHtmlTemplate(title, bodyContent) {
     `;
 }
 const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
-
 // --- handleReplySend (main reply engine with variables support) ---
 async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSession = {}) {
     if (!replyObj || !replyObj.replies || replyObj.replies.length === 0) return "No reply found";
@@ -189,8 +188,7 @@ app.post('/api/chatbot/message', async (req, res) => {
 });
 
 // ========== ADMIN ROUTES ==========
-// -- Admin Login Page, Dashboard, Logout (same as before, paste here) --
-// --- Admin Login ---
+// Admin Login Page
 app.get('/admin/login', (req, res) => {
     const loginForm = `
     <form method="POST" action="/admin/login">
@@ -215,7 +213,6 @@ app.post('/admin/login', async (req, res) => {
     req.session.username = username;
     res.redirect('/admin/dashboard');
 });
-
 app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     const dashboardContent = `
     <h1>Welcome Admin: ${req.session.username}</h1>
@@ -234,16 +231,14 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Dashboard', dashboardContent));
 });
 app.get('/admin/logout', (req, res) => { req.session.destroy(() => res.redirect('/admin/login')); });
-
 // ---- Add Chat Reply FORM with DYNAMIC Variables PICKER ----
 app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     // --- GET custom variables for JS inject ---
-    // In /admin/add-chat-replies GET route:
-const customVariables = await CustomVariable.find({});
-const customVarArr = customVariables.map(v => `%${v.name}%`);
-const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
+    const customVariables = await CustomVariable.find({});
+    const customVarArr = customVariables.map(v => `%${v.name}%`);
+    const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
 
-const addReplyForm = `
+    const addReplyForm = `
 <form method="POST" action="/admin/add-chat-replies" style="max-width:480px;margin:auto;">
     <label for="ruleName"><b>Rule Name:</b></label>
     <input name="ruleName" id="ruleName" placeholder="e.g. Greet User" required />
@@ -298,7 +293,6 @@ const defaultVars = [
 ];
 const allVars = [...defaultVars, ...(window.customVarListArr || [])];
 
-// Picker
 function showVariablePicker(inputId) {
     let modal = document.getElementById('varPickerModal');
     if (!modal) {
@@ -317,7 +311,6 @@ function showVariablePicker(inputId) {
         document.body.appendChild(modal);
     }
 }
-
 function insertVariable(inputId, value) {
     const el = document.getElementById(inputId);
     if (el) {
@@ -359,7 +352,8 @@ input:focus, textarea:focus, select:focus { border-color: #367aff; background: #
 label { font-weight: 600; color: #212245; margin-bottom: 5px; display:block; }
 </style>
 `;
-res.set({ 'Content-Type': 'text/html', 'Content-Disposition': 'inline' }).send(getHtmlTemplate('Add Chat Reply', addReplyForm));
+    res.set({ 'Content-Type': 'text/html', 'Content-Disposition': 'inline' }).send(getHtmlTemplate('Add Chat Reply', addReplyForm));
+});
 
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
@@ -380,7 +374,8 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     await newReply.save();
     res.redirect('/admin/reply-list');
 });
-// ======= Helper Functions =======
+
+// Helper icons
 function getReplyIcon(r) {
     if (r.type && r.type.includes('react')) return "😂";
     if (r.type === 'exact_match') return "🎯";
@@ -403,7 +398,7 @@ function formatSend(r) {
     return words.slice(0, 20).join(' ') + ' ...';
 }
 
-// ========== Stylish /admin/reply-list Route ==========
+// Stylish Reply List
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const replies = await ChatReply.find().sort({ priority: -1 });
     const listItems = replies.map((r, index) => `
@@ -470,6 +465,7 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content));
 });
 
+// -- Continue edit/delete/add custom variables and server start in Part 4
 // ========== EDIT REPLY ==========
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     try {
@@ -479,9 +475,9 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         }
         // Inject custom variables for JS
         const customVariables = await CustomVariable.find({});
-const customVarArr = customVariables.map(v => `%${v.name}%`);
-const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
-const editReplyForm = `
+        const customVarArr = customVariables.map(v => `%${v.name}%`);
+        const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
+        const editReplyForm = `
 <form method="POST" action="/admin/edit-reply/${reply._id}" style="max-width:480px;margin:auto;">
     <label for="ruleName"><b>Rule Name:</b></label>
     <input name="ruleName" id="ruleName" value="${reply.ruleName || ''}" required />
@@ -528,8 +524,74 @@ const editReplyForm = `
     <button type="submit" style="width:100%;margin-top:20px;padding:12px 0;background:#296aff;color:#fff;font-weight:700;font-size:18px;border:none;border-radius:8px;">Update Reply</button>
 </form>
 ${customVarScript}
-${getVariablePickerScript()}
+<script>
+const defaultVars = [
+    "%message%", "%message_LENGTH%", "%capturing_group_ID%", "%name%",
+    "%first_name%", "%last_name%", "%chat_name%", "%last_name%", "%date%", "%time%",
+    "%hour%", "%minute%", "%second%", "%am/pm%", "%day_of_month%", "%month%", "%year%", "%rule_id%"
+];
+const allVars = [...defaultVars, ...(window.customVarListArr || [])];
+
+function showVariablePicker(inputId) {
+    let modal = document.getElementById('varPickerModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'varPickerModal';
+        modal.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:#19193be3;display:flex;align-items:center;justify-content:center;z-index:5000;";
+        modal.innerHTML = \`
+          <div style="background:#212245;padding:22px 16px 12px 16px;border-radius:18px;box-shadow:0 8px 36px #000a;width:355px;max-width:94vw;">
+            <h2 style="color:#ffd870;margin-bottom:12px;text-align:center;font-family:Lexend,Inter,sans-serif;font-size:22px;font-weight:700;letter-spacing:.3px;">Insert Variable</h2>
+            <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px 10px;margin-bottom:16px;">
+              ${allVars.map(v => `<button style="padding:10px 0;border-radius:9px;border:1.5px solid #e5e6ff;background:#272753;color:#ffd870;font-family:Roboto Mono,monospace;font-size:15px;cursor:pointer;font-weight:600;transition:.15s;" onclick="insertVariable('${inputId}','${v.replace(/'/g,"\\\\'")}')">${v}</button>`).join('')}
+            </div>
+            <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:8px 30px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:17px;display:block;margin:auto;">Close</button>
+          </div>
+        \`;
+        document.body.appendChild(modal);
+    }
+}
+function insertVariable(inputId, value) {
+    const el = document.getElementById(inputId);
+    if (el) {
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        el.value = el.value.substring(0, start) + value + el.value.substring(end);
+        el.focus();
+        el.selectionStart = el.selectionEnd = start + value.length;
+    }
+    document.getElementById('varPickerModal')?.remove();
+}
+function handleTypeChange() {
+    const type = document.getElementById('type').value;
+    const keywordField = document.getElementById('keywordField');
+    const patternField = document.getElementById('patternField');
+    const isDefaultField = document.getElementById('isDefaultField');
+    keywordField.style.display = 'none';
+    patternField.style.display = 'none';
+    isDefaultField.style.display = 'none';
+    if (type === 'exact_match' || type === 'pattern_matching') keywordField.style.display = 'block';
+    if (type === 'expert_pattern_matching') patternField.style.display = 'block';
+    if (type === 'default_message') isDefaultField.style.display = 'block';
+}
+</script>
+<style>
+input, textarea, select {
+    width: 100%;
+    margin-bottom: 14px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: 1.5px solid #b6b6d1;
+    padding: 8px 12px;
+    background: #f8f8fd;
+    color: #202050;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+}
+input:focus, textarea:focus, select:focus { border-color: #367aff; background: #f4f8ff;}
+label { font-weight: 600; color: #212245; margin-bottom: 5px; display:block; }
+</style>
 `;
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
     } catch (error) {
         console.error('Error fetching reply for edit:', error);
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading reply for edit.</p><br><a href="/admin/reply-list">Back to List</a>'));
@@ -572,7 +634,6 @@ app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
 });
 
 // ========== CUSTOM VARIABLE CRUD ==========
-
 // List all custom variables
 app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
     try {
@@ -630,7 +691,7 @@ app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
         </form>
         <a href="/admin/custom-variables">← Back to Variables</a>
     `;
-    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Custom Variable', form));
+res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Custom Variable', form));
 });
 app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
     const { name, value } = req.body;
