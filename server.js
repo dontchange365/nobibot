@@ -101,11 +101,22 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
     }
     try {
         const customVariables = await CustomVariable.find({});
-        for (const variable of customVariables) {
-            const regex = new RegExp(`%${variable.name}%`, 'g');
-            replyText = replyText.replace(regex, variable.value);
+        // Nested variable resolver
+        function resolveNestedVars(text) {
+            let prev, round = 0;
+            do {
+                prev = text;
+                for (const variable of customVariables) {
+                    const regex = new RegExp(`%${variable.name}%`, 'g');
+                    text = text.replace(regex, variable.value);
+                }
+                round++;
+            } while (/%[a-zA-Z0-9_]+%/.test(text) && text !== prev && round < 10);
+            return text;
         }
+        replyText = resolveNestedVars(replyText);
     } catch (error) { console.error("Custom variable error:", error); }
+
     // --- (Variable replacements for message, name, time, etc...) ---
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     replyText = replyText.replace(/%message%/g, userMessage || '');
