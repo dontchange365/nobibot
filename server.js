@@ -719,6 +719,11 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
                     transition: box-shadow 0.18s;
                     max-width: 550px;
                     margin: auto;
+                     min-height: 85px; /* ADD THIS LINE */
+    display: flex; /* NEW */
+    flex-direction: column; /* NEW */
+    justify-content: flex-start; /* NEW */
+
                 }
                 .custom-var-box:hover {
                     box-shadow: 0 4px 18px #bb6ffa33;
@@ -784,6 +789,24 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
                 .btn:hover { background: #7343c9; }
                 .btn.back { background: #e6e6e6; color: #5e5e5e; }
                 .btn.back:hover { background: #bdbdbd; color: #222; }
+                monospace;
+    font-size: 15px;
+    color: #272b34;
+    max-height: 52px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    background: #f8f6fa;
+    border-radius: 8px;
+    padding: 9px 14px;
+    margin-bottom: 2px;
+    word-break: break-all;
+    width: 100%; /* ADD THIS LINE */
+    min-height: 34px; /* ADD THIS LINE */
+    box-sizing: border-box; /* ADD THIS LINE */
+}
             </style>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Manage Custom Variables', content));
