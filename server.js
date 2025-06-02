@@ -640,14 +640,35 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
             .delete-var-btn .lucide { color: #ff236b;}
             .edit-var-btn .lucide { color: #825be0;}
             .var-value {
-                font-family: 'Roboto Mono',monospace; font-size: 1rem;
-                color: #272b34; background: #f8f6fa; border-radius: 9px;
-                padding: 7px 13px; margin-bottom: 2px; word-break:break-all;
-                width: 100%; min-height: 32px; box-sizing: border-box; display: block;
-                letter-spacing:0.04em;
-                transition:background .12s;
+                font-family: 'Roboto Mono', monospace;
+                font-size: 1rem;
+                color: #272b34;
+                background: #f8f6fa;
+                border-radius: 9px;
+                padding: 7px 13px;
+                margin-bottom: 2px;
+                word-break: break-all;
+                width: 100%;
+                min-height: 32px;
+                box-sizing: border-box;
+                display: -webkit-box; /* For multi-line ellipsis */
+                letter-spacing: 0.04em;
+                max-height: 44px; /* Fixed height for 2 lines of text (approx) */
+                overflow: hidden;
+                text-overflow: ellipsis;
+                -webkit-line-clamp: 2; /* Show 2 lines max */
+                -webkit-box-orient: vertical;
+                white-space: normal; /* Allow text to wrap within the 2 lines */
+                transition: background .12s, max-height .22s;
+                cursor: pointer;
+                position: relative;
             }
-            .custom-var-card:hover .var-value { background: #efe1f9; }
+            .custom-var-card:hover .var-value {
+                background: #efe1f9;
+                max-height: 250px; /* Expand to show full content on hover */
+                overflow-y: auto;
+                -webkit-line-clamp: unset; /* Disable line clamping on hover */
+            }
             @media (max-width: 600px){
                 .custom-vars-panel{ max-width:98vw;}
                 .big-head { font-size:1.35rem;}
@@ -1201,7 +1222,7 @@ function getReplyIcon(r) {
 }
 
 // Function to truncate text to a word limit
-function truncateWords(txt, wordLimit) {
+function trimText(txt, wordLimit) {
     if (!txt) return '';
     const words = txt.trim().split(/\s+/); // Split by one or more spaces
     // Check if the original string or truncated version is shorter
