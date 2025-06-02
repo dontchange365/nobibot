@@ -317,14 +317,14 @@ app.get('/admin/login', (req, res) => {
         <input type="password" name="password" id="password" placeholder="Password" required />
         <button type="submit">Login</button>
     </form>`;
-    res.send(getHtmlTemplate('Admin Login', loginForm));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Login', loginForm));
 });
 
 app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
     const admin = await Admin.findOne({ username });
     if (!admin || !(await admin.comparePassword(password))) {
-        return res.send(getHtmlTemplate('Login Failed', `
+        return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Login Failed', `
             <p>Login failed. <a href="/admin/login">Try again</a></p>
         `));
     }
@@ -367,7 +367,7 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
         }
     </style>
 `;
-    res.send(getHtmlTemplate('Admin Dashboard', dashboardContent));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Dashboard', dashboardContent));
 });
 
 // LOGOUT
@@ -490,12 +490,12 @@ function insertVariable(variable) {
     }
     </script>
     `;
-    res.send(getHtmlTemplate('Add Chat Reply', addReplyForm));
+     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Chat Reply', addReplyForm));
 });
 
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
-    if (!replies) return res.send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>'));
+    if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>'));
 
     // If setting a new default message, unset existing ones
     if (type === 'default_message' && isDefault === 'true') {
@@ -667,14 +667,14 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     </script>
     `;
 
-    res.send(getHtmlTemplate('Chat Reply List', content));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Chat Reply List', content));
 });
 
 // EDIT REPLY
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     const r = await ChatReply.findById(req.params.id);
     if (!r) {
-        return res.send(getHtmlTemplate('Error', '<p>Reply not found.</p><br><a href="/admin/reply-list">Back to Reply List</a>'));
+        return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Reply not found.</p><br><a href="/admin/reply-list">Back to Reply List</a>'));
     }
 
     let customVarList = '';
@@ -781,7 +781,7 @@ function insertVariable(variable) {
     <br>
     <a href="/admin/reply-list">← Back to Reply List</a>
     `;
-    res.send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
 });
 
 app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
@@ -905,10 +905,10 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
                 }
             </style>
         `;
-        res.send(getHtmlTemplate('Custom Variables', content));
+            res.set('Content-Type', 'text/html').send(getHtmlTemplate('Custom Variables', content));
     } catch (error) {
         console.error("Error fetching custom variables:", error);
-        res.send(getHtmlTemplate('Error', '<p>Error loading custom variables.</p><br><a href="/admin/dashboard">Back to Dashboard</a>'));
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading custom variables.</p><br><a href="/admin/dashboard">Back to Dashboard</a>'));
     }
 });
 
@@ -944,21 +944,21 @@ app.get('/admin/add-variable', isAuthenticated, (req, res) => {
     <br>
     <a href="/admin/custom-variables">← Back to Custom Variables</a>
 `;
-    res.send(getHtmlTemplate('Add Variable', addVariableForm));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Variable', addVariableForm));
 });
 
 // POST: Handle adding new variable
 app.post('/admin/add-variable', isAuthenticated, async (req, res) => {
     let { name, value } = req.body;
     if (!name || !value) {
-        return res.send(getHtmlTemplate('Error', '<p>Variable name and value are required.</p><br><a href="/admin/add-variable">Back</a>'));
+        return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Variable name and value are required.</p><br><a href="/admin/add-variable">Back</a>'));
     }
 
     // Clean: space to underscore, lowercase
     name = name.trim().replace(/\s+/g, '_').toLowerCase();
 
     if (!/^[a-z0-9_]+$/.test(name)) {
-        return res.send(getHtmlTemplate('Error', '<p>Variable name must contain only letters, numbers, and underscores.</p><br><a href="/admin/add-variable">Back</a>'));
+        return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Variable name must contain only letters, numbers, and underscores.</p><br><a href="/admin/add-variable">Back</a>'));
     }
 
     try {
@@ -967,10 +967,10 @@ app.post('/admin/add-variable', isAuthenticated, async (req, res) => {
         res.redirect('/admin/custom-variables');
     } catch (error) {
         if (error.code === 11000) {
-            return res.send(getHtmlTemplate('Error', '<p>This variable already exists.</p><br><a href="/admin/add-variable">Back</a>'));
+            return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>This variable already exists.</p><br><a href="/admin/add-variable">Back</a>'));
         }
         console.error("Error adding variable:", error);
-        res.send(getHtmlTemplate('Error', '<p>Server error while adding variable.</p><br><a href="/admin/add-variable">Back</a>'));
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Server error while adding variable.</p><br><a href="/admin/add-variable">Back</a>'));
     }
 });
 
@@ -979,7 +979,7 @@ app.get('/admin/edit-variable/:id', isAuthenticated, async (req, res) => {
     try {
         const variable = await CustomVariable.findById(req.params.id);
         if (!variable) {
-            return res.send(getHtmlTemplate('Error', '<p>Variable not found.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+            return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Variable not found.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
         }
         const editVariableForm = `
             <form method="POST" action="/admin/edit-variable/${variable._id}">
@@ -993,10 +993,10 @@ app.get('/admin/edit-variable/:id', isAuthenticated, async (req, res) => {
             <br>
             <a href="/admin/custom-variables">← Back to Custom Variables</a>
         `;
-        res.send(getHtmlTemplate('Edit Variable', editVariableForm));
+          res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Variable', editVariableForm));
     } catch (error) {
         console.error("Error fetching variable for edit:", error);
-        res.send(getHtmlTemplate('Error', '<p>Error loading variable for editing.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading variable for editing.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
     }
 });
 
@@ -1008,7 +1008,7 @@ app.post('/admin/edit-variable/:id', isAuthenticated, async (req, res) => {
         res.redirect('/admin/custom-variables');
     } catch (error) {
         console.error("Error updating variable:", error);
-        res.send(getHtmlTemplate('Error', '<p>Error updating custom variable.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating custom variable.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
     }
 });
 
@@ -1019,7 +1019,7 @@ app.get('/admin/delete-variable/:id', isAuthenticated, async (req, res) => {
         res.redirect('/admin/custom-variables');
     } catch (error) {
         console.error("Error deleting variable:", error);
-        res.send(getHtmlTemplate('Error', '<p>Error deleting custom variable.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error deleting custom variable.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
     }
 });
 
