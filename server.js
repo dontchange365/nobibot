@@ -1073,6 +1073,10 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
                 <i class="lucide lucide-wrench"></i>
                 <span>Manage Custom Variables</span>
             </a>
+<a href="/import-export.html" class="admin-card">
+  <i class="lucide lucide-upload"></i>
+  <span>Import / Export Rules</span>
+</a>
             <a href="/admin/logout" class="admin-card">
                 <i class="lucide lucide-log-out"></i>
                 <span>Logout</span>
