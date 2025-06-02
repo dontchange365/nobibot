@@ -87,6 +87,36 @@ function getHtmlTemplate(title, bodyContent) {
     `;
 }
 const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+// ===== Recursive Replace Function =====
+// This function recursively replaces variables within a given text.
+// It iterates up to maxDepth to prevent infinite loops in case of circular references.
+async function resolveVariables(text, customVariables, maxDepth = 8) {
+    let result = text;
+    let depth = 0;
+    // Create a map for quick lookup of variable values
+    const varMap = {};
+    customVariables.forEach(v => { varMap[v.name] = v.value; });
+
+    let matched;
+    // Loop until no more variables are matched or maxDepth is reached
+    do {
+        matched = false;
+        // Regex to find %VARIABLE_NAME% patterns
+        result = result.replace(/%([a-zA-Z0-9_]+)%/g, (match, vname) => {
+            // If the variable name exists in our map, replace it
+            if (varMap[vname] !== undefined) {
+                matched = true; // Mark that a replacement occurred
+                return varMap[vname];
+            }
+            // If not found, return the original match (e.g., %rule_id%)
+            return match;
+        });
+        depth++;
+    } while (matched && depth < maxDepth); // Continue if replacements happened and depth limit not reached
+    return result;
+}
+
 // --- handleReplySend (main reply engine with variables support) ---
 async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSession = {}) {
     if (!replyObj || !replyObj.replies || replyObj.replies.length === 0) return "No reply found";
@@ -97,14 +127,21 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
         case 'random':
         default: replyText = randomReply(replyObj.replies); break;
     }
+
     try {
+        // --- Custom variable replacement (with recursion for nested) ---
+        // Fetch all custom variables from the database
         const customVariables = await CustomVariable.find({});
-        for (const variable of customVariables) {
-            const regex = new RegExp(`%${variable.name}%`, 'g');
-            replyText = replyText.replace(regex, variable.value);
-        }
-    } catch (error) { console.error("Custom variable error:", error); }
-    // --- (Variable replacements for message, name, time, etc...) ---
+        // Resolve all custom variables, including nested ones
+        replyText = await resolveVariables(replyText, customVariables);
+    } catch (error) {
+        console.error("Custom variable resolution error:", error);
+        // Optionally, you might want to return an error message to the user
+        // or just continue with the partially resolved text.
+    }
+
+    // --- (Variable replacements for message, name, time, etc.) ---
+    // These are non-custom variables, processed after custom ones.
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     replyText = replyText.replace(/%message%/g, userMessage || '');
     replyText = replyText.replace(/%message_(\d+)%/g, (match, len) => (userMessage || '').substring(0, parseInt(len)));
