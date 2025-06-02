@@ -127,9 +127,26 @@ const allVariables = [
   "%rndm_ascii_LENGTH%", "%rndm_symbol_LENGTH%", "%rndm_grawlix_LENGTH%"
 ];
 
-function toggleVariableList() {
-  const list = document.getElementById('existingVars');
+function toggleVariableList(button) {
+  const form = button.closest('form');
+  const list = form.querySelector('.variable-dropdown'); // Use closest dropdown
+  const textarea = form.querySelector('textarea'); // Find the correct textarea
+
+  if (!list || !textarea) return;
+
   list.innerHTML = '';
+  allVariables.forEach(v => {
+    const li = document.createElement('li');
+    li.textContent = v;
+    li.style.cursor = 'pointer';
+    li.onmousedown = () => {
+      insertVariable(v, textarea, list);
+    };
+    list.appendChild(li);
+  });
+
+  list.style.display = list.style.display === 'block' ? 'none' : 'block';
+}
 
   allVariables.forEach(v => {
     const li = document.createElement('li');
@@ -145,15 +162,14 @@ function toggleVariableList() {
   list.style.display = 'none';
 });
 
-function insertVariable(variable) {
-  const textarea = document.getElementById('replies');
+function insertVariable(v, textarea, list) {
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
   const text = textarea.value;
-  textarea.value = text.substring(0, start) + variable + text.substring(end);
+  textarea.value = text.slice(0, start) + v + text.slice(end);
   textarea.focus();
-  textarea.selectionEnd = start + variable.length;
-  document.getElementById('existingVars').style.display = 'none';
+  textarea.selectionEnd = start + v.length;
+  list.style.display = 'none';
 }
 
 // Auto-suggestion on % typing
@@ -524,18 +540,34 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 <button type="button" onclick="toggleVariableList()">🧠 Insert Variable</button>
 <ul id="existingVars" class="variable-dropdown"></ul>
 <script>
-function toggleVariableList() {
-    const list = document.getElementById('existingVars');
-    list.style.display = list.style.display === 'none' ? 'block' : 'none';
+function toggleVariableList(button) {
+  const form = button.closest('form');
+  const list = form.querySelector('.variable-dropdown'); // Use closest dropdown
+  const textarea = form.querySelector('textarea'); // Find the correct textarea
+
+  if (!list || !textarea) return;
+
+  list.innerHTML = '';
+  allVariables.forEach(v => {
+    const li = document.createElement('li');
+    li.textContent = v;
+    li.style.cursor = 'pointer';
+    li.onmousedown = () => {
+      insertVariable(v, textarea, list);
+    };
+    list.appendChild(li);
+  });
+
+  list.style.display = list.style.display === 'block' ? 'none' : 'block';
 }
-function insertVariable(variable) {
-    const textarea = document.getElementById('replies');
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    textarea.value = text.substring(0, start) + variable + text.substring(end);
-    textarea.focus();
-    textarea.selectionEnd = start + variable.length;
+function insertVariable(v, textarea, list) {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  textarea.value = text.slice(0, start) + v + text.slice(end);
+  textarea.focus();
+  textarea.selectionEnd = start + v.length;
+  list.style.display = 'none';
 }
 </script>
             **Available replacements:**<br>
@@ -837,24 +869,40 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
        <label for="replies">Replies (use &lt;#&gt; between lines):</label>
 <textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>
 
-<button type="button" onclick="toggleVariableList()">🧠 Insert Variable</button>
+<button type="button" onclick="toggleVariableList(this)">🧠 Insert Variable</button>
 <ul id="existingVars" style="display:none; padding:10px; margin-top:10px; border:1px solid #ccc; background:#f9f9f9;">
     ${customVariables.map(v => `<li style="cursor:pointer;" onclick="insertVariable('%${v.name}%')"><code>%${v.name}%</code></li>`).join('')}
 </ul>
 
 <script>
-function toggleVariableList() {
-    const list = document.getElementById('existingVars');
-    list.style.display = list.style.display === 'none' ? 'block' : 'none';
+function toggleVariableList(button) {
+  const form = button.closest('form');
+  const list = form.querySelector('.variable-dropdown'); // Use closest dropdown
+  const textarea = form.querySelector('textarea'); // Find the correct textarea
+
+  if (!list || !textarea) return;
+
+  list.innerHTML = '';
+  allVariables.forEach(v => {
+    const li = document.createElement('li');
+    li.textContent = v;
+    li.style.cursor = 'pointer';
+    li.onmousedown = () => {
+      insertVariable(v, textarea, list);
+    };
+    list.appendChild(li);
+  });
+
+  list.style.display = list.style.display === 'block' ? 'none' : 'block';
 }
-function insertVariable(variable) {
-    const textarea = document.getElementById('replies');
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    textarea.value = text.substring(0, start) + variable + text.substring(end);
-    textarea.focus();
-    textarea.selectionEnd = start + variable.length;
+function insertVariable(v, textarea, list) {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  textarea.value = text.slice(0, start) + v + text.slice(end);
+  textarea.focus();
+  textarea.selectionEnd = start + v.length;
+  list.style.display = 'none';
 }
 </script>
         <small>
@@ -1056,10 +1104,26 @@ app.get('/admin/add-variable', isAuthenticated, async (req, res) => {
         </form>
 
         <script>
-        function toggleVariableList() {
-            const list = document.getElementById('existingVars');
-            list.style.display = list.style.display === 'none' ? 'block' : 'none';
-        }
+function toggleVariableList(button) {
+  const form = button.closest('form');
+  const list = form.querySelector('.variable-dropdown'); // Use closest dropdown
+  const textarea = form.querySelector('textarea'); // Find the correct textarea
+
+  if (!list || !textarea) return;
+
+  list.innerHTML = '';
+  allVariables.forEach(v => {
+    const li = document.createElement('li');
+    li.textContent = v;
+    li.style.cursor = 'pointer';
+    li.onmousedown = () => {
+      insertVariable(v, textarea, list);
+    };
+    list.appendChild(li);
+  });
+
+  list.style.display = list.style.display === 'block' ? 'none' : 'block';
+}
 
         function fillVariable(val) {
             document.getElementById('value').value = val;
