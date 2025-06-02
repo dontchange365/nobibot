@@ -386,7 +386,7 @@ function formatSend(r) {
     const words = replyText.split(/\s+/);
     if (words.length <= 20) return replyText;
     return words.slice(0, 20).join(' ') + ' ...';
-
+}
 
 // ========== Stylish /admin/reply-list Route ==========
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
