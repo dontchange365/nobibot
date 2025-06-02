@@ -702,94 +702,66 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
             <div class="custom-var-list">${listItems || '<em>No variables found.</em>'}</div>
             <a class="btn" href="/admin/add-custom-variable">➕ Add New Variable</a>
             <a class="btn back" href="/admin/dashboard">← Back to Dashboard</a>
-            <style>
-                .custom-var-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 18px;
-                    margin: 18px 0 30px 0;
-                }
-                .custom-var-box {
-                    background: linear-gradient(95deg, #fff, #f2e6ff 60%);
-                    border: 1.5px solid #c7b0fa;
-                    border-radius: 14px;
-                    box-shadow: 0 2px 12px #b785fa22;
-                    padding: 14px 22px 10px 22px;
-                    position: relative;
-                    transition: box-shadow 0.18s;
-                    max-width: 550px;
-                    margin: auto;
-                     min-height: 85px; /* ADD THIS LINE */
-    display: flex; /* NEW */
-    flex-direction: column; /* NEW */
-    justify-content: flex-start; /* NEW */
-
-                }
-                .custom-var-box:hover {
-                    box-shadow: 0 4px 18px #bb6ffa33;
-                }
-                .var-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 8px;
-                    gap: 18px;
-                }
-                .var-name {
-                    font-family: 'Lexend', 'Inter', sans-serif;
-                    font-size: 18px;
-                    font-weight: 700;
-                    color: #7339b3;
-                    word-break: break-all;
-                }
-                .var-actions a {
-                    display: inline-flex;
-                    align-items: center;
-                    color: #656565;
-                    margin-left: 10px;
-                    opacity: 0.82;
-                    transition: color 0.18s, opacity 0.12s;
-                }
-                .var-actions a:hover {
-                    color: #9e2cff;
-                    opacity: 1;
-                }
-                .var-actions svg {
-                    vertical-align: middle;
-                    margin-bottom: 1.5px;
-                }
-                .var-value {
-                    font-family: 'Roboto Mono', monospace;
-                    font-size: 15px;
-                    color: #272b34;
-                    max-height: 52px; /* Show only 3 lines (about) */
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    display: -webkit-box;
-                    -webkit-line-clamp: 3; /* Show 3 lines */
-                    -webkit-box-orient: vertical;
-                    background: #f8f6fa;
-                    border-radius: 8px;
-                    padding: 9px 14px;
-                    margin-bottom: 2px;
-                    word-break: break-all;
-                }
-                .btn {
-                    background: #8e5eff;
-                    color: #fff;
-                    padding: 10px 18px;
-                    border-radius: 6px;
-                    text-decoration: none;
-                    margin-right: 8px;
-                    transition: background 0.16s;
-                    display: inline-block;
-                    font-weight: 500;
-                    font-size: 15px;
-                }
-                .btn:hover { background: #7343c9; }
-                .btn.back { background: #e6e6e6; color: #5e5e5e; }
-                .btn.back:hover { background: #bdbdbd; color: #222; }
-                monospace;
+            .custom-var-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin: 18px 0 30px 0;
+    width: 100%;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.custom-var-box {
+    background: linear-gradient(95deg, #fff, #f2e6ff 60%);
+    border: 1.5px solid #c7b0fa;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px #b785fa22;
+    padding: 14px 22px 10px 22px;
+    position: relative;
+    transition: box-shadow 0.18s;
+    width: 100%;           /* FIX 1: Box will always be 100% */
+    min-height: 85px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    box-sizing: border-box; /* FIX 2: Include padding in width */
+}
+.custom-var-box:hover {
+    box-shadow: 0 4px 18px #bb6ffa33;
+}
+.var-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    gap: 18px;
+}
+.var-name {
+    font-family: 'Lexend', 'Inter', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #7339b3;
+    word-break: break-all;
+}
+.var-actions a {
+    display: inline-flex;
+    align-items: center;
+    color: #656565;
+    margin-left: 10px;
+    opacity: 0.82;
+    transition: color 0.18s, opacity 0.12s;
+}
+.var-actions a:hover {
+    color: #9e2cff;
+    opacity: 1;
+}
+.var-actions svg {
+    vertical-align: middle;
+    margin-bottom: 1.5px;
+}
+.var-value {
+    font-family: 'Roboto Mono', monospace;
     font-size: 15px;
     color: #272b34;
     max-height: 52px;
@@ -803,11 +775,12 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
     padding: 9px 14px;
     margin-bottom: 2px;
     word-break: break-all;
-    width: 100%; /* ADD THIS LINE */
-    min-height: 34px; /* ADD THIS LINE */
-    box-sizing: border-box; /* ADD THIS LINE */
+    width: 100%;         /* FIX 3: Always 100% width of parent */
+    min-height: 34px;
+    box-sizing: border-box;
+    /* NEW: Always expand to parent width */
+    display: block;
 }
-            </style>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Manage Custom Variables', content));
     } catch (error) {
