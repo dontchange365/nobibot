@@ -1,3 +1,5 @@
+// ========== server.js ==========
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
@@ -9,17 +11,15 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ==== MONGODB URI (production me env se lena) ====
+// --- DB URI (change only if needed, env recommended for prod) ---
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://dontchange365:DtUiOMFzQVM0tG9l@nobifeedback.9ntuipc.mongodb.net/?retryWrites=true&w=majority&appName=nobifeedback';
 
-// ==== CONNECT MONGOOSE ====
+// --- Connect MongoDB ---
 mongoose.connect(MONGO_URI)
     .then(() => console.log('MongoDB Connected!'))
     .catch(err => console.error('MongoDB connection error:', err));
 
-// ==== MONGOOSE SCHEMAS ====
-
-// Admin Schema
+// --- Mongoose Schemas ---
 const AdminSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true }
@@ -36,7 +36,6 @@ AdminSchema.methods.comparePassword = function(candidatePassword) {
 };
 const Admin = mongoose.model('Admin', AdminSchema);
 
-// ChatReply Schema
 const ChatReplySchema = new mongoose.Schema({
     ruleName: { type: String, required: true },
     type: { type: String, required: true },
@@ -49,14 +48,13 @@ const ChatReplySchema = new mongoose.Schema({
 });
 const ChatReply = mongoose.model('ChatReply', ChatReplySchema);
 
-// Custom Variable Schema
 const CustomVariableSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true, trim: true },
     value: { type: String, required: true }
 });
 const CustomVariable = mongoose.model('CustomVariable', CustomVariableSchema);
 
-// ==== MIDDLEWARES ====
+// --- Middleware ---
 app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
 app.use(bodyParser.json({ limit: '100mb' }));
 app.use(session({
@@ -68,15 +66,11 @@ app.use(session({
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ==== HELPER FUNCTIONS ====
-
-// Auth checker
+// --- Helper Functions ---
 function isAuthenticated(req, res, next) {
     if (req.session.loggedIn) return next();
     return res.redirect('/admin/login');
 }
-
-// HTML template
 function getHtmlTemplate(title, bodyContent) {
     return `
     <!DOCTYPE html>
@@ -93,34 +87,113 @@ function getHtmlTemplate(title, bodyContent) {
     </html>
     `;
 }
+const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-// ==== REPLY LIST HELPERS ==== (yeh functions sirf ek jagah hona chahiye)
-function getReplyIcon(r) {
-    if (r.type && r.type.includes('react')) return "😂";
-    if (r.type === 'exact_match') return "🎯";
-    if (r.type === 'pattern_matching') return "🧩";
-    if (r.type === 'expert_pattern_matching') return "🧠";
-    if (r.type === 'welcome_message') return "👋";
-    if (r.type === 'default_message') return "💬";
-    return "";
-}
-function formatReceive(r) {
-    if (r.type === 'exact_match' || r.type === 'pattern_matching') return r.keyword || '-';
-    if (r.type === 'expert_pattern_matching') return r.pattern || '-';
-    return (r.keyword || r.pattern || '-');
-}
-function formatSend(r) {
-    return (r.replies || []).join('<#>').slice(0, 600) + ((r.replies.join('<#>').length > 600) ? ' ...' : '');
+// --- handleReplySend (main reply engine with variables support) ---
+async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSession = {}) {
+    if (!replyObj || !replyObj.replies || replyObj.replies.length === 0) return "No reply found";
+    let replyText;
+    switch (replyObj.sendMethod) {
+        case 'once': replyText = replyObj.replies[0]; break;
+        case 'all': replyText = replyObj.replies.join('\n'); break;
+        case 'random':
+        default: replyText = randomReply(replyObj.replies); break;
+    }
+    try {
+        const customVariables = await CustomVariable.find({});
+        for (const variable of customVariables) {
+            const regex = new RegExp(`%${variable.name}%`, 'g');
+            replyText = replyText.replace(regex, variable.value);
+        }
+    } catch (error) { console.error("Custom variable error:", error); }
+    // --- (Variable replacements for message, name, time, etc...) ---
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    replyText = replyText.replace(/%message%/g, userMessage || '');
+    replyText = replyText.replace(/%message_(\d+)%/g, (match, len) => (userMessage || '').substring(0, parseInt(len)));
+    if (matchedRegexGroups) {
+        replyText = replyText.replace(/%capturing_group_(\d+)%/g, (match, groupId) => {
+            return matchedRegexGroups[parseInt(groupId)] || '';
+        });
+    }
+    const userName = reqSession.username || 'User';
+    replyText = replyText.replace(/%name%/g, userName);
+    replyText = replyText.replace(/%first_name%/g, userName.split(' ')[0] || '');
+    replyText = replyText.replace(/%last_name%/g, userName.split(' ').slice(1).join(' ') || '');
+    replyText = replyText.replace(/%chat_name%/g, userName);
+
+    // --- Date & time variables ---
+    const optionsDate = { year: 'numeric', month: 'long', day: 'numeric' };
+    const optionsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+    replyText = replyText.replace(/%date%/g, now.toLocaleDateString('en-IN', optionsDate));
+    replyText = replyText.replace(/%time%/g, now.toLocaleTimeString('en-IN', optionsTime));
+    replyText = replyText.replace(/%hour%/g, now.toLocaleTimeString('en-IN', { hour: 'numeric', hour12: true }).split(' ')[0]);
+    replyText = replyText.replace(/%minute%/g, String(now.getMinutes()).padStart(2, '0'));
+    replyText = replyText.replace(/%second%/g, String(now.getSeconds()).padStart(2, '0'));
+    replyText = replyText.replace(/%am\/pm%/g, now.getHours() >= 12 ? 'pm' : 'am');
+    replyText = replyText.replace(/%day_of_month%/g, String(now.getDate()).padStart(2, '0'));
+    replyText = replyText.replace(/%month%/g, String(now.getMonth() + 1).padStart(2, '0'));
+    replyText = replyText.replace(/%year%/g, String(now.getFullYear()));
+
+    // -- Random string/grawlix stuff (optional, add if you want full support) --
+    // .. (Skipping for brevity, add if you need advanced random variables)
+    return replyText;
 }
 
-// ==== ROUTES ====
-
-// 1. Home
+// --- Public Home Page (index.html in /public) ---
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-// 2. ADMIN LOGIN
+// --- Chatbot Message API Route ---
+app.post('/api/chatbot/message', async (req, res) => {
+    const userMessage = req.body.message;
+    let botReply = "Sorry, I didn't understand that.";
+    let matchedRegexGroups = null;
+
+    if (!req.session.seenWelcome) {
+        req.session.seenWelcome = true;
+        try {
+            const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
+            if (welcomeReply) {
+                return res.json({ reply: await handleReplySend(welcomeReply, userMessage, null, req.session) });
+            }
+        } catch (e) { console.error("Welcome message error:", e); }
+    }
+
+    try {
+        const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
+        if (exact) return res.json({ reply: await handleReplySend(exact, userMessage, null, req.session) });
+
+        const patterns = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 });
+        for (const reply of patterns) {
+            const keywords = reply.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
+            if (keywords.some(k => userMessage.toLowerCase().includes(k))) {
+                return res.json({ reply: await handleReplySend(reply, userMessage, null, req.session) });
+            }
+        }
+
+        const regexMatches = await ChatReply.find({ type: 'expert_pattern_matching', pattern: { $ne: null } }).sort({ priority: -1 });
+        for (const reply of regexMatches) {
+            try {
+                const regex = new RegExp(reply.pattern, 'i');
+                const match = regex.exec(userMessage);
+                if (match) {
+                    matchedRegexGroups = match;
+                    return res.json({ reply: await handleReplySend(reply, userMessage, matchedRegexGroups, req.session) });
+                }
+            } catch (e) { console.error("Regex pattern error:", e); }
+        }
+        const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
+        if (fallback) return res.json({ reply: await handleReplySend(fallback, userMessage, null, req.session) });
+    } catch (e) {
+        console.error(e);
+        botReply = "Nobi Bot error: try again later.";
+    }
+    res.json({ reply: botReply });
+});
+// ========== ADMIN ROUTES ==========
+
+// -- Admin Login Page
 app.get('/admin/login', (req, res) => {
     const loginForm = `
     <form method="POST" action="/admin/login">
@@ -145,11 +218,8 @@ app.post('/admin/login', async (req, res) => {
     req.session.username = username;
     res.redirect('/admin/dashboard');
 });
-app.get('/admin/logout', (req, res) => {
-    req.session.destroy(() => res.redirect('/admin/login'));
-});
 
-// 3. DASHBOARD
+// -- Admin Dashboard
 app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     const dashboardContent = `
     <h1>Welcome Admin: ${req.session.username}</h1>
@@ -186,14 +256,23 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Dashboard', dashboardContent));
 });
 
-// 4. ADD REPLY FORM
+// -- Logout
+app.get('/admin/logout', (req, res) => {
+    req.session.destroy(() => res.redirect('/admin/login'));
+});
+
+// -- Add Chat Reply Form
 app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     let customVarList = '';
     try {
         const customVariables = await CustomVariable.find({});
         customVarList = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
-        if (customVarList) customVarList = `<br>**Custom Variables:** ${customVarList}`;
-    } catch (e) { }
+        if (customVarList) {
+            customVarList = `<br>**Custom Variables:** ${customVarList}`;
+        }
+    } catch (e) {
+        console.error("Error fetching custom variables for form:", e);
+    }
     const addReplyForm = `
     <form method="POST" action="/admin/add-chat-replies">
         <label for="ruleName">Rule Name:</label>
@@ -228,9 +307,8 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
             **Available replacements:**<br>
             **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
             **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
-            **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
+            **Date & Time:** %date%, %time%, %hour%, %minute%, %second%, %am/pm%, %day_of_month%, %month%, %year%<br>
             **AutoResponder:** %rule_id%<br>
-            **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
             ${customVarList}
         </small>
         <label for="priority">Priority:</label>
@@ -259,12 +337,18 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     }
     </script>
     `;
-    res.set({ 'Content-Type': 'text/html', 'Content-Disposition': 'inline' }).send(getHtmlTemplate('Add Chat Reply', addReplyForm));
+    res.set({
+        'Content-Type': 'text/html',
+        'Content-Disposition': 'inline'
+    }).send(getHtmlTemplate('Add Chat Reply', addReplyForm));
 });
+
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>'));
-    if (type === 'default_message' && isDefault === 'true') await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
+    if (type === 'default_message' && isDefault === 'true') {
+        await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
+    }
     const newReply = new ChatReply({
         ruleName,
         type,
@@ -279,7 +363,26 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     res.redirect('/admin/reply-list');
 });
 
-// 5. REPLY LIST (STYLISH)
+// ======= Helper Functions =======
+function getReplyIcon(r) {
+    if (r.type && r.type.includes('react')) return "😂";
+    if (r.type === 'exact_match') return "🎯";
+    if (r.type === 'pattern_matching') return "🧩";
+    if (r.type === 'expert_pattern_matching') return "🧠";
+    if (r.type === 'welcome_message') return "👋";
+    if (r.type === 'default_message') return "💬";
+    return "";
+}
+function formatReceive(r) {
+    if (r.type === 'exact_match' || r.type === 'pattern_matching') return r.keyword || '-';
+    if (r.type === 'expert_pattern_matching') return r.pattern || '-';
+    return (r.keyword || r.pattern || '-');
+}
+function formatSend(r) {
+    return (r.replies || []).join('<#>').slice(0, 600) + ((r.replies.join('<#>').length > 600) ? ' ...' : '');
+}
+
+// ========== Stylish /admin/reply-list Route ==========
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const replies = await ChatReply.find().sort({ priority: -1 });
     const listItems = replies.map((r, index) => `
@@ -316,17 +419,68 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
         </div>
         <style>
             body { background: #1a1a1a; }
-            .nobita-title { color: #fff; font-family: 'Lexend', 'Inter', sans-serif; letter-spacing: 1px; margin-bottom: 24px; text-align: center; font-weight: 700; font-size: 28px; }
-            .nobita-reply-panel { max-width: 600px; margin: 32px auto 60px auto; padding: 0 6px; }
-            .reply-card { background: linear-gradient(98deg, #272733 80%, #3d1153 100%); border: 1.5px solid #d074f9cc; border-radius: 16px; box-shadow: 0 3px 18px #0006; padding: 16px 16px 12px 16px; margin-bottom: 30px; position: relative; }
-            .reply-header { font-size: 19px; font-weight: 700; color: #fff; letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-            .reply-title { text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
-            .reply-inner { background: rgba(34,34,40,0.75); border-radius: 10px; padding: 12px 14px 8px 14px; }
-            .reply-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 7px; flex-wrap: wrap; }
-            .reply-label { min-width: 70px; color: #ffc952; font-family: 'Lexend', 'Inter', sans-serif; font-weight: 600; font-size: 15px; letter-spacing: 0.3px; }
+            .nobita-title {
+                color: #fff;
+                font-family: 'Lexend', 'Inter', sans-serif;
+                letter-spacing: 1px;
+                margin-bottom: 24px;
+                text-align: center;
+                font-weight: 700;
+                font-size: 28px;
+            }
+            .nobita-reply-panel {
+                max-width: 600px;
+                margin: 32px auto 60px auto;
+                padding: 0 6px;
+            }
+            .reply-card {
+                background: linear-gradient(98deg, #272733 80%, #3d1153 100%);
+                border: 1.5px solid #d074f9cc;
+                border-radius: 16px;
+                box-shadow: 0 3px 18px #0006;
+                padding: 16px 16px 12px 16px;
+                margin-bottom: 30px;
+                position: relative;
+            }
+            .reply-header {
+                font-size: 19px;
+                font-weight: 700;
+                color: #fff;
+                letter-spacing: 1px;
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .reply-title {
+                text-transform: uppercase;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .reply-inner {
+                background: rgba(34,34,40,0.75);
+                border-radius: 10px;
+                padding: 12px 14px 8px 14px;
+            }
+            .reply-row {
+                display: flex;
+                gap: 8px;
+                align-items: flex-start;
+                margin-bottom: 7px;
+                flex-wrap: wrap;
+            }
+            .reply-label {
+                min-width: 70px;
+                color: #ffc952;
+                font-family: 'Lexend', 'Inter', sans-serif;
+                font-weight: 600;
+                font-size: 15px;
+                letter-spacing: 0.3px;
+            }
             .reply-label.send { color: #ff6f61; }
             .reply-label.receive { color: #46e579; }
-.reply-receive, .reply-send {
+            .reply-receive, .reply-send {
                 color: #fff;
                 font-family: 'Roboto Mono', monospace;
                 font-size: 15px;
@@ -373,14 +527,13 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content));
 });
-// EDIT REPLY
+// ========== EDIT REPLY ==========
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     try {
         const reply = await ChatReply.findById(req.params.id);
         if (!reply) {
             return res.status(404).set('Content-Type', 'text/html').send(getHtmlTemplate('Not Found', '<p>Reply not found.</p><br><a href="/admin/reply-list">Back to List</a>'));
         }
-
         let customVarList = '';
         try {
             const customVariables = await CustomVariable.find({});
@@ -388,10 +541,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             if (customVarList) {
                 customVarList = `<br>**Custom Variables:** ${customVarList}`;
             }
-        } catch (e) {
-            console.error("Error fetching custom variables for form:", e);
-        }
-
+        } catch (e) { console.error("Error fetching custom variables for form:", e); }
         const editReplyForm = `
         <form method="POST" action="/admin/edit-reply/${reply._id}">
             <label for="ruleName">Rule Name:</label>
@@ -411,32 +561,26 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
                 <option value="default_message" ${reply.type === 'default_message' ? 'selected' : ''}>Default Message</option>
             </select>
-
             <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
                 <label for="keyword">Keyword(s):</label>
                 <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
             </div>
-
             <div id="patternField" style="${reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
                 <label for="pattern">Regex Pattern:</label>
                 <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Only for Expert Regex. Use () for capturing groups." />
             </div>
-
             <label for="replies">Replies (use &lt;#&gt; between lines):</label>
             <textarea name="replies" id="replies" required>${reply.replies.join('<#>')}</textarea>
             <small>
                 **Available replacements:**<br>
                 **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
                 **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
-                **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
+                **Date & Time:** %date%, %time%, %hour%, %minute%, %second%, %am/pm%, %day_of_month%, %month%, %year%<br>
                 **AutoResponder:** %rule_id%<br>
-                **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
                 ${customVarList}
             </small>
-
             <label for="priority">Priority:</label>
             <input type="number" name="priority" id="priority" value="${reply.priority}" />
-
             <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
                 <label for="isDefault">Is Default?</label>
                 <select name="isDefault" id="isDefault">
@@ -444,14 +588,23 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                     <option value="true" ${reply.isDefault ? 'selected' : ''}>Yes</option>
                 </select>
             </div>
-
             <button type="submit">Update Reply</button>
         </form>
         <a href="/admin/reply-list">← Back to List</a>
-
         <script>
-        // Re-run handleTypeChange on page load for edit form to set initial visibility
         document.addEventListener('DOMContentLoaded', handleTypeChange);
+        function handleTypeChange() {
+            const type = document.getElementById('type').value;
+            const keywordField = document.getElementById('keywordField');
+            const patternField = document.getElementById('patternField');
+            const isDefaultField = document.getElementById('isDefaultField');
+            keywordField.style.display = 'none';
+            patternField.style.display = 'none';
+            isDefaultField.style.display = 'none';
+            if (type === 'exact_match' || type === 'pattern_matching') keywordField.style.display = 'block';
+            if (type === 'expert_pattern_matching') patternField.style.display = 'block';
+            if (type === 'default_message') isDefaultField.style.display = 'block';
+        }
         </script>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
@@ -460,19 +613,14 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading reply for edit.</p><br><a href="/admin/reply-list">Back to List</a>'));
     }
 });
-
 app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     const replyId = req.params.id;
-
     if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/edit-reply/' + replyId + '">Back to Edit Reply</a>'));
-
     try {
-        // If updating to a new default message, unset existing ones
         if (type === 'default_message' && isDefault === 'true') {
             await ChatReply.updateMany({ type: 'default_message', _id: { $ne: replyId } }, { isDefault: false });
         }
-
         await ChatReply.findByIdAndUpdate(replyId, {
             ruleName,
             type,
@@ -490,7 +638,7 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     }
 });
 
-// DELETE REPLY
+// ========== DELETE REPLY ==========
 app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
     try {
         await ChatReply.findByIdAndDelete(req.params.id);
@@ -501,10 +649,8 @@ app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
     }
 });
 
-// --- Custom Variables Management (As per your initial code - manage page, add/edit/delete routes) ---
-
-// List Custom Variables
-// List Custom Variables (with stylish box UI)
+// ========== CUSTOM VARIABLE CRUD ==========
+// List
 app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
     try {
         const variables = await CustomVariable.find({});
@@ -513,100 +659,29 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
                 <div class="var-header">
                     <div class="var-name">%${v.name}%</div>
                     <div class="var-actions">
-                        <a title="Edit" href="/admin/edit-custom-variable/${v._id}"><svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg></a>
-                        <a title="Delete" href="/admin/delete-custom-variable/${v._id}" onclick="return confirm('Delete this variable?')"><svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg></a>
+                        <a title="Edit" href="/admin/edit-custom-variable/${v._id}"><svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg></a>
+                        <a title="Delete" href="/admin/delete-custom-variable/${v._id}" onclick="return confirm('Delete this variable?')"><svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg></a>
                     </div>
                 </div>
                 <div class="var-value">${v.value.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
             </div>
         `).join('');
-
         const content = `
             <h2 style="margin-top:0;">Manage Custom Variables</h2>
             <div class="custom-var-list">${listItems || '<em>No variables found.</em>'}</div>
             <a class="btn" href="/admin/add-custom-variable">➕ Add New Variable</a>
             <a class="btn back" href="/admin/dashboard">← Back to Dashboard</a>
             <style>
-            .custom-var-list {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    margin: 18px 0 30px 0;
-    width: 100%;
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
-}
-.custom-var-box {
-    background: linear-gradient(95deg, #fff, #f2e6ff 60%);
-    border: 1.5px solid #c7b0fa;
-    border-radius: 14px;
-    box-shadow: 0 2px 12px #b785fa22;
-    padding: 14px 22px 10px 22px;
-    position: relative;
-    transition: box-shadow 0.18s;
-    width: 100%;           /* FIX 1: Box will always be 100% */
-    min-height: 85px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    box-sizing: border-box; /* FIX 2: Include padding in width */
-}
-.custom-var-box:hover {
-    box-shadow: 0 4px 18px #bb6ffa33;
-}
-.var-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-    gap: 18px;
-}
-.var-name {
-    font-family: 'Lexend', 'Inter', sans-serif;
-    font-size: 18px;
-    font-weight: 700;
-    color: #7339b3;
-    word-break: break-all;
-}
-.var-actions a {
-    display: inline-flex;
-    align-items: center;
-    color: #656565;
-    margin-left: 10px;
-    opacity: 0.82;
-    transition: color 0.18s, opacity 0.12s;
-}
-.var-actions a:hover {
-    color: #9e2cff;
-    opacity: 1;
-}
-.var-actions svg {
-    vertical-align: middle;
-    margin-bottom: 1.5px;
-}
-.var-value {
-    font-family: 'Roboto Mono', monospace;
-    font-size: 15px;
-    color: #272b34;
-    max-height: 52px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    background: #f8f6fa;
-    border-radius: 8px;
-    padding: 9px 14px;
-    margin-bottom: 2px;
-    word-break: break-all;
-    width: 100%;         /* FIX 3: Always 100% width of parent */
-    min-height: 34px;
-    box-sizing: border-box;
-    /* NEW: Always expand to parent width */
-    display: block;
-}
-</style>
+            .custom-var-list { display: flex; flex-direction: column; gap: 18px; margin: 18px 0 30px 0; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; }
+            .custom-var-box { background: linear-gradient(95deg, #fff, #f2e6ff 60%); border: 1.5px solid #c7b0fa; border-radius: 14px; box-shadow: 0 2px 12px #b785fa22; padding: 14px 22px 10px 22px; position: relative; transition: box-shadow 0.18s; width: 100%; min-height: 85px; display: flex; flex-direction: column; justify-content: flex-start; box-sizing: border-box; }
+            .custom-var-box:hover { box-shadow: 0 4px 18px #bb6ffa33; }
+            .var-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 18px; }
+            .var-name { font-family: 'Lexend', 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: #7339b3; word-break: break-all; }
+            .var-actions a { display: inline-flex; align-items: center; color: #656565; margin-left: 10px; opacity: 0.82; transition: color 0.18s, opacity 0.12s; }
+            .var-actions a:hover { color: #9e2cff; opacity: 1; }
+            .var-actions svg { vertical-align: middle; margin-bottom: 1.5px; }
+            .var-value { font-family: 'Roboto Mono', monospace; font-size: 15px; color: #272b34; max-height: 52px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; background: #f8f6fa; border-radius: 8px; padding: 9px 14px; margin-bottom: 2px; word-break: break-all; width: 100%; min-height: 34px; box-sizing: border-box; display: block; }
+            </style>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Manage Custom Variables', content));
     } catch (error) {
@@ -614,8 +689,7 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading custom variables.</p>'));
     }
 });
-
-// Add Custom Variable Form
+// Add
 app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
     const form = `
         <h2>Add New Custom Variable</h2>
@@ -630,8 +704,6 @@ app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
     `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Custom Variable', form));
 });
-
-// Add Custom Variable POST
 app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
     const { name, value } = req.body;
     try {
@@ -641,21 +713,19 @@ app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
     } catch (error) {
         console.error('Error adding custom variable:', error);
         let errorMessage = 'Error adding custom variable.';
-        if (error.code === 11000) { //   Duplicate key error
+        if (error.code === 11000) {
             errorMessage = `Variable name '%${name}%' already exists. Please choose a different name.`;
         }
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>${errorMessage}</p><br><a href="/admin/add-custom-variable">Try again</a>`));
     }
 });
-
-// Edit Custom Variable Form
+// Edit
 app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
     try {
         const variable = await CustomVariable.findById(req.params.id);
         if (!variable) {
             return res.status(404).set('Content-Type', 'text/html').send(getHtmlTemplate('Not Found', '<p>Variable not found.</p><br><a href="/admin/custom-variables">Back to List</a>'));
         }
-
         const form = `
             <h2>Edit Custom Variable</h2>
             <form method="POST" action="/admin/edit-custom-variable/${variable._id}">
@@ -673,10 +743,8 @@ app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => 
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading variable for edit.</p><br><a href="/admin/custom-variables">Back to List</a>'));
     }
 });
-
-// Edit Custom Variable POST
 app.post('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
-    const { value } = req.body; // Name is readonly, so only value can be updated
+    const { value } = req.body;
     try {
         await CustomVariable.findByIdAndUpdate(req.params.id, { value });
         res.redirect('/admin/custom-variables');
@@ -685,8 +753,7 @@ app.post('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) =>
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating custom variable.</p><br><a href="/admin/edit-custom-variable/' + req.params.id + '">Try again</a>'));
     }
 });
-
-// Delete Custom Variable
+// Delete
 app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) => {
     try {
         await CustomVariable.findByIdAndDelete(req.params.id);
@@ -697,8 +764,7 @@ app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) =
     }
 });
 
-
-// --- Server Start ---
+// ========== SERVER START ==========
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
