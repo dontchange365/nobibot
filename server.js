@@ -1231,11 +1231,11 @@ function trimText(txt, wordLimit) {
 }
 function formatReceive(r) {
     const text = (r.type === 'exact_match' || r.type === 'pattern_matching') ? r.keyword : (r.type === 'expert_pattern_matching' ? r.pattern : (r.keyword || r.pattern || ''));
-    return truncateWords(text, 4); // Limit to 4 words for receive
+    return trimText(text, 4); // Fixed: calling trimText
 }
 function formatSend(r) {
     const text = (r.replies || []).join('<#>');
-    return truncateWords(text, 20); // Limit to 20 words for send
+    return trimText(text, 20); // Fixed: calling trimText
 }
 
 
