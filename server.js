@@ -69,7 +69,7 @@ function isAuthenticated(req, res, next) {
     if (req.session.loggedIn) return next();
     return res.redirect('/admin/login');
 }
-function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeDashboardStyles = false) {
+function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeDashboardStyles = false, includeCustomVarStyles = false) {
     let styles = '';
     if (includeFormStyles) {
         styles += `
@@ -566,6 +566,131 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
         </style>
         `;
     }
+    if (includeCustomVarStyles) {
+        styles += `
+        <style>
+            body { background: linear-gradient(120deg, #f6ecff 0%, #e7d3fa 100%); min-height:100vh; margin:0; }
+            .custom-vars-panel {
+                max-width: 680px; margin: 38px auto 0 auto; padding: 0 10px 40px 10px;
+                font-family: 'Lexend', 'Inter', sans-serif;
+            }
+            .top-bar {
+                display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+                gap: 12px; flex-wrap: wrap;
+            }
+            .top-btn {
+                display: flex; align-items: center; gap: 7px;
+                background: linear-gradient(92deg, #a78bfa 30%, #b583f3 100%);
+                color: #fff; font-weight: 700; border: none;
+                border-radius: 14px; padding: 11px 20px; font-size: 1.03rem;
+                text-decoration: none; box-shadow: 0 3px 16px #a58ed966;
+                transition: background 0.17s, transform 0.13s, box-shadow 0.14s;
+            }
+            .top-btn.add { background: linear-gradient(90deg,#7e4af5 30%,#e75cd3 100%);}
+            .top-btn.dash { background: linear-gradient(90deg,#6c47e5 10%,#aa7dfc 90%);}
+            .top-btn:hover { background: linear-gradient(90deg,#4d1bb0,#ad3fe0 90%); transform: scale(1.045);}
+            .top-btn:active {transform:scale(0.97);}
+            .big-head {
+                font-size: 2.2rem; color: #8227b3; letter-spacing:1.4px;
+                font-weight: 800; margin-bottom: 27px; margin-top: 13px; text-align:center; text-shadow:0 2px 14px #c4a2ed37;
+            }
+            .custom-var-list {
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(310px,1fr));
+                gap: 24px; width:100%;
+            }
+            .custom-var-card {
+                background: rgba(249,243,255,0.89); border-radius: 18px;
+                box-shadow: 0 6px 24px #ceaeff37, 0 1.5px 7px #e5d4ff35;
+                padding: 23px 20px 15px 20px; min-height:90px;
+                border: 2px solid #d8b5ff44; position: relative;
+                overflow: hidden; transition: transform .22s, box-shadow .22s, border .22s, background .25s;
+                opacity: 0; transform: translateY(40px) scale(0.98);
+            }
+            .custom-var-card.show {
+                opacity:1; transform: none;
+            }
+            .custom-var-card:hover {
+                background: linear-gradient(120deg, #f9edff 30%, #f5ddff 100%);
+                box-shadow: 0 16px 40px #c68ef55e, 0 1.5px 7px #b5a2ff22;
+                border: 2.7px solid #b793ff90;
+                transform: scale(1.033) translateY(-3px) rotate(-0.5deg);
+                z-index:2;
+            }
+            .var-header {
+                display: flex; align-items: center; justify-content: space-between; margin-bottom:10px;
+            }
+            .var-name {
+                font-size: 1.35rem; color: #7e34bc; font-weight: 700;
+                background: linear-gradient(90deg, #a779fa 30%, #cd59ec 100%);
+                padding: 4px 13px; border-radius: 8px; letter-spacing:0.3px;
+                box-shadow:0 1.5px 7px #e7d6ff22;
+            }
+            .var-actions {
+                display: flex; gap:10px;
+            }
+            .edit-var-btn, .delete-var-btn {
+                background: rgba(255,255,255,0.55); border: none;
+                border-radius: 8px; box-shadow: 0 1.5px 5px #e5d2fa33;
+                padding: 5.5px 8.5px; cursor: pointer; transition: background .15s, transform .13s;
+                display: flex; align-items: center; justify-content: center;
+            }
+            .edit-var-btn:hover { background: #e2e4fb; transform: scale(1.1);}
+            .delete-var-btn:hover { background: #fff0f7; transform: scale(1.1);}
+            .edit-var-btn .lucide, .delete-var-btn .lucide { width:21px; height:21px; }
+            .delete-var-btn .lucide { color: #ff236b;}
+            .edit-var-btn .lucide { color: #825be0;}
+            .var-value {
+                font-family: 'Roboto Mono',monospace; font-size: 1rem;
+                color: #272b34; background: #f8f6fa; border-radius: 9px;
+                padding: 7px 13px; margin-bottom: 2px; word-break:break-all;
+                width: 100%; min-height: 32px; box-sizing: border-box; display: block;
+                letter-spacing:0.04em;
+                transition:background .12s;
+            }
+            .custom-var-card:hover .var-value { background: #efe1f9; }
+            @media (max-width: 600px){
+                .custom-vars-panel{ max-width:98vw;}
+                .big-head { font-size:1.35rem;}
+                .custom-var-list{ grid-template-columns:1fr; gap:18px;}
+                .custom-var-card{padding:15px 10px 10px 10px;}
+                .top-btn { padding: 8px 14px; font-size: 0.95rem; }
+            }
+
+            /* Edit Custom Variable Styles */
+            .edit-var-panel { max-width:470px; margin:44px auto; font-family:'Lexend','Inter',sans-serif;}
+            .edit-var-form {
+                background:rgba(249,243,255,0.92); border-radius:18px; box-shadow:0 7px 24px #ceaeff37;
+                padding:33px 27px 18px 27px; border:2px solid #d8b5ff44; position:relative; transition:transform .22s,box-shadow .22s,border .22s,background .25s;
+                opacity:0; transform:translateY(35px) scale(0.98);
+            }
+            .edit-var-form.show{opacity:1;transform:none;}
+            .edit-head{font-size:1.45rem; font-weight:700; color:#8227b3; margin-bottom:20px; letter-spacing:0.5px; display:flex;align-items:center;gap:10px;}
+            .field{margin-bottom:17px;}
+            label{font-size:1.08rem; font-weight:600; color:#6939ba; display:block; margin-bottom:5px;} /* Added display block for consistency */
+            input[type="text"],input[type="email"],input[type="number"],textarea {
+                width:100%; border-radius:11px; border:1.8px solid #e5dbfa; background:#faf6ff; color:#271446;
+                font-size:1.02rem; padding:11px 14px; transition:border 0.17s,box-shadow 0.18s,background 0.1s;
+                box-sizing:border-box; margin-top:6px;
+            }
+            input:focus,textarea:focus{
+                border:1.8px solid #a671f3; box-shadow:0 0 0 2.5px #e7dbffcc; background:#f5efff; outline:none;
+            }
+            textarea{min-height:70px;resize:vertical;}
+            .btn-main{
+                background:linear-gradient(90deg,#7e4af5 40%,#bf51e8 100%);
+                color:#fff; font-weight:700; font-size:1.15rem;
+                border-radius:13px; border:none; padding:12px 0; margin-top:15px; width:100%;
+                box-shadow:0 5px 16px #c79fff44; transition:box-shadow 0.17s,background 0.19s,transform 0.12s; cursor:pointer;
+                display:flex;align-items:center;justify-content:center;gap:7px;
+            }
+            .btn-main:hover{background:linear-gradient(90deg,#6124d4 40%,#8227b3 100%);box-shadow:0 9px 28px #b48ffa55;transform:translateY(-2px);}
+            .btn-main:active{transform:scale(0.98);}
+            @media (max-width:600px){.edit-var-panel{max-width:98vw;}.edit-var-form{padding:18px 7px 15px 7px;}}
+            /* Common top-bar style for edit forms */
+            .top-bar .lucide { width: 20px; height: 20px; }
+        </style>
+        `;
+    }
     // Shared Variable Popup HTML and JS are added at the very end of the body
     const sharedPopupAndScript = `
     <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center; opacity:0; pointer-events: none;">
@@ -623,7 +748,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
       function insertVarToReply(variable) {
         // Find the currently focused textarea with id 'replies'
         // This is important for delegation, to know which textarea to insert into
-        const textarea = document.getElementById('replies');
+        const textarea = document.getElementById('replies'); // Assuming 'replies' is the common ID for the textarea
         if (textarea) { // Ensure textarea exists
             const start = textarea.selectionStart;
             const end = textarea.selectionEnd;
@@ -667,7 +792,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
       // Listen for clicks on the document body
       document.body.addEventListener('click', function(e){
         // Check if the clicked element (or its parent) has the 'reply-icon-btn' class
-        // This allows the click to work even if the SVG icon itself is clicked
+        // This uses .closest() which is robust for nested elements
         if(e.target.closest('.reply-icon-btn')) {
           varPopup.style.opacity = '1';
           varPopup.style.pointerEvents = 'auto';
@@ -685,7 +810,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${title}</title>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Lexend:wght@600;800&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Lexend:wght@600;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.306.0/dist/lucide-static.min.css"/>
         ${styles}
     </head>
@@ -704,7 +829,9 @@ const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
 function trimText(txt, wordLimit) {
     if (!txt) return '';
     const words = txt.trim().split(/\s+/); // Split by one or more spaces
-    return words.length > wordLimit ? words.slice(0, wordLimit).join(" ") + "..." : txt;
+    // Check if the original string or truncated version is shorter
+    const truncatedText = words.slice(0, wordLimit).join(" ");
+    return words.length > wordLimit ? truncatedText + "..." : txt;
 }
 
 // --- handleReplySend (main reply engine with variables support) ---
@@ -979,7 +1106,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
                   <option value="exact_match">Exact Match</option>
                   <option value="pattern_matching">Pattern Matching</option>
                   <option value="expert_pattern_matching">Expert Regex</option>
-                  <option value="welcome_message">Welcome Message</p>
+                  <option value="welcome_message">Welcome Message</option>
                   <option value="default_message">Default Message</option>
               </select>
             </div>
@@ -1457,54 +1584,77 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
     try {
         const variables = await CustomVariable.find({});
         const listItems = variables.map(v => `
-            <div class="custom-var-box">
+            <div class="custom-var-card fadein">
                 <div class="var-header">
-                    <div class="var-name">%${v.name}%</div>
+                    <div class="var-name"><code>%${v.name}%</code></div>
                     <div class="var-actions">
-                        <a title="Edit" href="/admin/edit-custom-variable/${v._id}"><svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg></a>
-                        <a title="Delete" href="/admin/delete-custom-variable/${v._id}" onclick="return confirm('Delete this variable?')"><svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg></a>
+                        <button class="edit-var-btn" onclick="window.location='/admin/edit-custom-variable/${v._id}'" title="Edit"><i class="lucide lucide-pencil"></i></button>
+                        <button class="delete-var-btn" onclick="deleteVariable('${v._id}','${v.name}')" title="Delete"><i class="lucide lucide-trash-2"></i></button>
                     </div>
                 </div>
-                <div class="var-value">${v.value.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+                <div class="var-value"><code>${v.value.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></div>
             </div>
         `).join('');
         const content = `
-            <h2 style="margin-top:0;">Manage Custom Variables</h2>
-            <div class="custom-var-list">${listItems || '<em>No variables found.</em>'}</div>
-            <a class="btn" href="/admin/add-custom-variable">➕ Add New Variable</a>
-            <a class="btn back" href="/admin/dashboard">← Back to Dashboard</a>
-            <style>
-            .custom-var-list { display: flex; flex-direction: column; gap: 18px; margin: 18px 0 30px 0; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; }
-            .custom-var-box { background: linear-gradient(95deg, #fff, #f2e6ff 60%); border: 1.5px solid #c7b0fa; border-radius: 14px; box-shadow: 0 2px 12px #b785fa22; padding: 14px 22px 10px 22px; position: relative; transition: box-shadow 0.18s; width: 100%; min-height: 85px; display: flex; flex-direction: column; justify-content: flex-start; box-sizing: border-box; }
-            .custom-var-box:hover { box-shadow: 0 4px 18px #bb6ffa33; }
-            .var-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 18px; }
-            .var-name { font-family: 'Lexend', 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: #7339b3; word-break: break-all; }
-            .var-actions a { display: inline-flex; align-items: center; color: #656565; margin-left: 10px; opacity: 0.82; transition: color 0.18s, opacity 0.12s; }
-            .var-actions a:hover { color: #9e2cff; opacity: 1; }
-            .var-actions svg { vertical-align: middle; margin-bottom: 1.5px; }
-            .var-value { font-family: 'Roboto Mono', monospace; font-size: 15px; color: #272b34; max-height: 52px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; background: #f8f6fa; border-radius: 8px; padding: 9px 14px; margin-bottom: 2px; word-break: break-all; width: 100%; min-height: 34px; box-sizing: border-box; display: block; }
-            </style>
+        <div class="custom-vars-panel">
+            <div class="top-bar">
+                <a href="/admin/dashboard" class="top-btn dash"><i class="lucide lucide-home"></i> Dashboard</a>
+                <a href="/admin/add-custom-variable" class="top-btn add"><i class="lucide lucide-plus-circle"></i> Add New Variable</a>
+            </div>
+            <h2 class="big-head">Manage Custom Variables</h2>
+            <div class="custom-var-list">${listItems || '<em style="color:#6a3cc9; text-align:center; display:block;">No variables found.</em>'}</div>
+        </div>
+        <script>
+        function deleteVariable(id, name) {
+            if(confirm("Delete variable %" + name + "%?")) {
+                window.location = "/admin/delete-custom-variable/" + id;
+            }
+        }
+        // Fade-in animation for cards
+        document.addEventListener("DOMContentLoaded", ()=>{
+            setTimeout(()=>{
+                document.querySelectorAll('.custom-var-card').forEach((card, index) => {
+                    // Add slight delay for staggered effect
+                    setTimeout(() => card.classList.add('show'), index * 50);
+                });
+            },120);
+        });
+        </script>
         `;
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Manage Custom Variables', content));
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Manage Custom Variables', content, false, false, true));
     } catch (error) {
         console.error('Error listing custom variables:', error);
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading custom variables.</p>'));
     }
 });
-// Add
+// Add Custom Variable
 app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
     const form = `
-        <h2>Add New Custom Variable</h2>
-        <form method="POST" action="/admin/add-custom-variable">
-            <label for="name">Variable Name (e.g., my_city, admin_email):</label>
-            <input name="name" id="name" placeholder="Should be unique, no spaces, e.g., welcome_greeting" required />
-            <label for="value">Variable Value:</label>
-            <textarea name="value" id="value" placeholder="The actual text this variable will replace." required></textarea>
-            <button type="submit">Add Variable</button>
-        </form>
-        <a href="/admin/custom-variables">← Back to Variables</a>
+        <div class="edit-var-panel">
+            <div class="top-bar">
+                <a href="/admin/custom-variables" class="top-btn dash"><i class="lucide lucide-list"></i> All Variables</a>
+                <a href="/admin/dashboard" class="top-btn add"><i class="lucide lucide-home"></i> Dashboard</a>
+            </div>
+            <form method="POST" action="/admin/add-custom-variable" class="edit-var-form fadein">
+                <h2 class="edit-head"><i class="lucide lucide-plus-circle"></i> Add New Custom Variable</h2>
+                <div class="field">
+                    <label for="name">Variable Name (e.g., my_city, admin_email):</label>
+                    <input name="name" id="name" placeholder="Should be unique, no spaces, e.g., welcome_greeting" required />
+                </div>
+                <div class="field">
+                    <label for="value">Variable Value:</label>
+                    <textarea name="value" id="value" placeholder="The actual text this variable will replace." required></textarea>
+                </div>
+                <button type="submit" class="btn-main"><i class="lucide lucide-save"></i> Add Variable</button>
+            </form>
+        </div>
+        <script>
+        document.addEventListener("DOMContentLoaded",()=>{
+            setTimeout(()=>{document.querySelector('.fadein').classList.add('show');},80);
+        });
+        </script>
     `;
-    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Custom Variable', form));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Custom Variable', form, false, false, true));
 });
 app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
     const { name, value } = req.body;
@@ -1521,7 +1671,7 @@ app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>${errorMessage}</p><br><a href="/admin/add-custom-variable">Try again</a>`));
     }
 });
-// Edit
+// Edit Custom Variable
 app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
     try {
         const variable = await CustomVariable.findById(req.params.id);
@@ -1529,17 +1679,31 @@ app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => 
             return res.status(404).set('Content-Type', 'text/html').send(getHtmlTemplate('Not Found', '<p>Variable not found.</p><br><a href="/admin/custom-variables">Back to List</a>'));
         }
         const form = `
-            <h2>Edit Custom Variable</h2>
-            <form method="POST" action="/admin/edit-custom-variable/${variable._id}">
-                <label for="name">Variable Name:</label>
-                <input name="name" id="name" value="${variable.name}" readonly />
-                <label for="value">Variable Value:</label>
-                <textarea name="value" id="value" required>${variable.value}</textarea>
-                <button type="submit">Update Variable</button>
+            <div class="edit-var-panel">
+            <div class="top-bar">
+                <a href="/admin/custom-variables" class="top-btn dash"><i class="lucide lucide-list"></i> All Variables</a>
+                <a href="/admin/dashboard" class="top-btn add"><i class="lucide lucide-home"></i> Dashboard</a>
+            </div>
+            <form method="POST" action="/admin/edit-custom-variable/${variable._id}" class="edit-var-form fadein">
+                <h2 class="edit-head"><i class="lucide lucide-pencil"></i> Edit Custom Variable</h2>
+                <div class="field">
+                    <label for="name">Variable Name:</label>
+                    <input name="name" id="name" value="${variable.name}" readonly />
+                </div>
+                <div class="field">
+                    <label for="value">Variable Value:</label>
+                    <textarea name="value" id="value" required>${variable.value}</textarea>
+                </div>
+                <button type="submit" class="btn-main"><i class="lucide lucide-save"></i> Update Variable</button>
             </form>
-            <a href="/admin/custom-variables">← Back to Variables</a>
+            </div>
+            <script>
+            document.addEventListener("DOMContentLoaded",()=>{
+                setTimeout(()=>{document.querySelector('.fadein').classList.add('show');},80);
+            });
+            </script>
         `;
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Custom Variable', form));
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Custom Variable', form, false, false, true));
     } catch (error) {
         console.error('Error fetching custom variable for edit:', error);
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading variable for edit.</p><br><a href="/admin/custom-variables">Back to List</a>'));
@@ -1555,7 +1719,7 @@ app.post('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) =>
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating custom variable.</p><br><a href="/admin/edit-custom-variable/' + req.params.id + '">Try again</a>'));
     }
 });
-// Delete
+// Delete Custom Variable
 app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) => {
     try {
         await CustomVariable.findByIdAndDelete(req.params.id);
