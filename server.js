@@ -188,7 +188,7 @@ app.post('/api/chatbot/message', async (req, res) => {
 });
 
 // ========== ADMIN ROUTES ==========
-// Admin Login Page
+// --- Admin Login ---
 app.get('/admin/login', (req, res) => {
     const loginForm = `
     <form method="POST" action="/admin/login">
@@ -213,6 +213,7 @@ app.post('/admin/login', async (req, res) => {
     req.session.username = username;
     res.redirect('/admin/dashboard');
 });
+
 app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     const dashboardContent = `
     <h1>Welcome Admin: ${req.session.username}</h1>
@@ -293,6 +294,7 @@ const defaultVars = [
 ];
 const allVars = [...defaultVars, ...(window.customVarListArr || [])];
 
+// Picker
 function showVariablePicker(inputId) {
     let modal = document.getElementById('varPickerModal');
     if (!modal) {
@@ -303,7 +305,7 @@ function showVariablePicker(inputId) {
           <div style="background:#212245;padding:22px 16px 12px 16px;border-radius:18px;box-shadow:0 8px 36px #000a;width:355px;max-width:94vw;">
             <h2 style="color:#ffd870;margin-bottom:12px;text-align:center;font-family:Lexend,Inter,sans-serif;font-size:22px;font-weight:700;letter-spacing:.3px;">Insert Variable</h2>
             <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px 10px;margin-bottom:16px;">
-              <div id="pickerList"></div>
+              \${allVars.map(v => `<button style="padding:10px 0;border-radius:9px;border:1.5px solid #e5e6ff;background:#272753;color:#ffd870;font-family:Roboto Mono,monospace;font-size:15px;cursor:pointer;font-weight:600;transition:.15s;" onclick="insertVariable('${inputId}','${v.replace(/'/g,"\\\\'")}')">\${v}</button>`).join('')}
             </div>
             <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:8px 30px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:17px;display:block;margin:auto;">Close</button>
           </div>
@@ -311,6 +313,7 @@ function showVariablePicker(inputId) {
         document.body.appendChild(modal);
     }
 }
+
 function insertVariable(inputId, value) {
     const el = document.getElementById(inputId);
     if (el) {
@@ -355,6 +358,7 @@ label { font-weight: 600; color: #212245; margin-bottom: 5px; display:block; }
     res.set({ 'Content-Type': 'text/html', 'Content-Disposition': 'inline' }).send(getHtmlTemplate('Add Chat Reply', addReplyForm));
 });
 
+// Save new reply
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>'));
@@ -375,7 +379,7 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     res.redirect('/admin/reply-list');
 });
 
-// Helper icons
+// Helper functions for reply list:
 function getReplyIcon(r) {
     if (r.type && r.type.includes('react')) return "😂";
     if (r.type === 'exact_match') return "🎯";
@@ -398,7 +402,7 @@ function formatSend(r) {
     return words.slice(0, 20).join(' ') + ' ...';
 }
 
-// Stylish Reply List
+// --- Reply List page ---
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const replies = await ChatReply.find().sort({ priority: -1 });
     const listItems = replies.map((r, index) => `
@@ -464,8 +468,6 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content));
 });
-
-// -- Continue edit/delete/add custom variables and server start in Part 4
 // ========== EDIT REPLY ==========
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     try {
@@ -477,6 +479,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         const customVariables = await CustomVariable.find({});
         const customVarArr = customVariables.map(v => `%${v.name}%`);
         const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
+
         const editReplyForm = `
 <form method="POST" action="/admin/edit-reply/${reply._id}" style="max-width:480px;margin:auto;">
     <label for="ruleName"><b>Rule Name:</b></label>
@@ -531,7 +534,7 @@ const defaultVars = [
     "%hour%", "%minute%", "%second%", "%am/pm%", "%day_of_month%", "%month%", "%year%", "%rule_id%"
 ];
 const allVars = [...defaultVars, ...(window.customVarListArr || [])];
-
+// Picker
 function showVariablePicker(inputId) {
     let modal = document.getElementById('varPickerModal');
     if (!modal) {
@@ -542,13 +545,15 @@ function showVariablePicker(inputId) {
           <div style="background:#212245;padding:22px 16px 12px 16px;border-radius:18px;box-shadow:0 8px 36px #000a;width:355px;max-width:94vw;">
             <h2 style="color:#ffd870;margin-bottom:12px;text-align:center;font-family:Lexend,Inter,sans-serif;font-size:22px;font-weight:700;letter-spacing:.3px;">Insert Variable</h2>
             <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px 10px;margin-bottom:16px;">
-              <div id="pickerList"></div>
+              \${allVars.map(v => `<button style="padding:10px 0;border-radius:9px;border:1.5px solid #e5e6ff;background:#272753;color:#ffd870;font-family:Roboto Mono,monospace;font-size:15px;cursor:pointer;font-weight:600;transition:.15s;" onclick="insertVariable('${inputId}','${v.replace(/'/g,"\\\\'")}')">\${v}</button>`).join('')}
+            </div>
             <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:8px 30px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:17px;display:block;margin:auto;">Close</button>
           </div>
         \`;
         document.body.appendChild(modal);
     }
 }
+
 function insertVariable(inputId, value) {
     const el = document.getElementById(inputId);
     if (el) {
@@ -596,6 +601,7 @@ label { font-weight: 600; color: #212245; margin-bottom: 5px; display:block; }
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading reply for edit.</p><br><a href="/admin/reply-list">Back to List</a>'));
     }
 });
+
 app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     const replyId = req.params.id;
@@ -690,7 +696,7 @@ app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
         </form>
         <a href="/admin/custom-variables">← Back to Variables</a>
     `;
-res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Custom Variable', form));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Custom Variable', form));
 });
 app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
     const { name, value } = req.body;
@@ -708,7 +714,7 @@ app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
     }
 });
 
-// Edit custom variable
+// Edit custom variable form
 app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
     try {
         const variable = await CustomVariable.findById(req.params.id);
@@ -732,6 +738,7 @@ app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => 
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading variable for edit.</p><br><a href="/admin/custom-variables">Back to List</a>'));
     }
 });
+
 app.post('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
     const { value } = req.body;
     try {
@@ -739,7 +746,7 @@ app.post('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) =>
         res.redirect('/admin/custom-variables');
     } catch (error) {
         console.error('Error updating custom variable:', error);
-        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating custom variable.</p><br><a href="/admin/edit-custom-variable/' + req.params.id + '">Try again</a>'));
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>Error updating custom variable.</p><br><a href="/admin/edit-custom-variable/${req.params.id}">Try again</a>`));
     }
 });
 
