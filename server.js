@@ -154,15 +154,6 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
             .form-card .select-wrapper {
                 position: relative;
             }
-            /* .select-wrapper::after { /* This is not needed if using SVG background in select */
-            /* content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%237d38a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); */
-            /* position: absolute; */
-            /* right: 12px; */
-            /* top: 50%; */
-            /* transform: translateY(-50%); */
-            /* pointer-events: none; */
-            /* height: 18px; width: 18px; */
-            /* } */
 
             .form-card textarea {
                 min-height: 60px;
@@ -414,8 +405,8 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 color: #8227b3; /* Changed to match form heading color */
                 font-family: 'Lexend', sans-serif;
                 letter-spacing: 1.5px;
-                margin-bottom: 24px;
-                text-align: center;
+                margin-bottom: 0; /* Adjusted for flex container */
+                text-align: left;
                 font-weight: 800;
                 font-size: 2.1rem;
                 text-shadow: 0 2px 14px #e3d2ff7c;
@@ -425,7 +416,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 align-items: center;
                 justify-content: space-between;
                 margin-bottom: 24px;
-                padding: 0 10px; /* Add some padding to align with cards */
+                padding: 0; /* Reset padding for consistency */
             }
             .add-reply-btn-top {
                 background: linear-gradient(90deg, #7e4af5 40%, #bf51e8 100%); /* Same as main button */
@@ -545,13 +536,8 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
             }
             .btn.back:hover { background: #ffc952; color: #282836; }
 
-
+            /* Responsive Adjustments for Reply List */
             @media (max-width: 700px) {
-                .admin-container { max-width: 98vw; }
-                .card-grid { grid-template-columns: 1fr; gap: 20px; }
-                .admin-card { min-height: 110px; }
-                h1 { font-size: 1.35rem; }
-
                 .add-reply-btn-top {
                     padding: 7px 10px;
                     font-size: 0; /* Hide text */
@@ -580,6 +566,118 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
         </style>
         `;
     }
+    // Shared Variable Popup HTML and JS are added at the very end of the body
+    const sharedPopupAndScript = `
+    <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center; opacity:0; pointer-events: none;">
+      <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:240px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
+        <div style="font-size:18px; font-weight:600; margin-bottom:10px; color:#7d38a8;">Variables</div>
+        <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:6px 10px;margin-bottom:12px;font-size:15px;border:1.2px solid #eee;border-radius:6px; box-sizing:border-box;">
+        <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:180px; overflow:auto;">
+          </ul>
+        <div style="margin-top:14px; text-align:right;">
+          <button id="varCloseBtn" style="padding:7px 16px; background:#f7f3ff; border-radius:7px; border:none; color:#a654eb; font-weight:600; font-size:15px; cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Common variables for the popup logic
+      const defaultVars = [
+          "%message%", "%message_LENGTH%", "%capturing_group_ID%",
+          "%name%", "%first_name%", "%last_name%", "%chat_name%", "%rule_id%",
+          "%date%", "%time%", "%hour%", "%minute%", "%second%", "%am/pm%", "%day_of_month%", "%month%", "%year%",
+          "%rndm_num_MIN_MAX%", "%rndm_custom_COUNT_ITEM1,ITEM2,ITEM3%", "%rndm_abc_lower_LEN%",
+          "%rndm_abc_upper_LEN%", "%rndm_alnum_LEN%", "%rndm_ascii_LEN%", "%rndm_grawlix_LEN%"
+      ];
+      // window.customVars will be defined in the specific route's script block
+      const allVars = [...defaultVars, ...(window.customVars || [])];
+
+      // Variable popup elements and core functions (defined once)
+      var varPopup = document.getElementById('varPopup');
+      var varSearchInput = document.getElementById('varSearch');
+      var varList = document.getElementById('varList');
+      var varCloseBtn = document.getElementById('varCloseBtn');
+
+      function showVarPopup() {
+        renderVarList('');
+        varSearchInput.value = '';
+        varSearchInput.focus();
+      }
+
+      function renderVarList(filter) {
+        varList.innerHTML = '';
+        allVars
+          .filter(v => v.toLowerCase().includes(filter.toLowerCase()))
+          .forEach(v => {
+            const li = document.createElement('li');
+            li.textContent = v;
+            li.style.cssText = "padding:8px 12px; cursor:pointer; border-radius:6px; font-size:16px; color:#7d38a8;";
+            li.onmouseover = () => li.style.background = "#f3eaff";
+            li.onmouseout = () => li.style.background = "";
+            li.onclick = () => insertVarToReply(v);
+            varList.appendChild(li);
+          });
+      }
+
+      function insertVarToReply(variable) {
+        // Find the currently focused textarea with id 'replies'
+        // This is important for delegation, to know which textarea to insert into
+        const textarea = document.getElementById('replies');
+        if (textarea) { // Ensure textarea exists
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const value = textarea.value;
+            textarea.value = value.substring(0, start) + variable + value.substring(end);
+            textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+            textarea.focus();
+        }
+        varPopup.style.opacity = '0';
+        varPopup.style.pointerEvents = 'none';
+      }
+
+      // Event Listeners for popup (defined once)
+      varSearchInput.oninput = function() {
+        renderVarList(this.value);
+      };
+
+      varCloseBtn.onclick = function() {
+        varPopup.style.opacity = '0';
+        varPopup.style.pointerEvents = 'none';
+      };
+
+      // Close popup if ESC key is pressed
+      document.addEventListener('keydown', function(e){
+        if(varPopup.style.pointerEvents === 'auto' && e.key === 'Escape'){
+          varPopup.style.opacity = '0';
+          varPopup.style.pointerEvents = 'none';
+        }
+      });
+
+      // Close popup if clicked outside (on the overlay)
+      varPopup.addEventListener('click', function(e){
+          if (e.target === varPopup) {
+              varPopup.style.opacity = '0';
+              varPopup.style.pointerEvents = 'none';
+          }
+      });
+
+
+      // -------- FIXED PART: USE EVENT DELEGATION FOR BUTTON --------
+      // Listen for clicks on the document body
+      document.body.addEventListener('click', function(e){
+        // Check if the clicked element (or its parent) has the 'reply-icon-btn' class
+        // This allows the click to work even if the SVG icon itself is clicked
+        if(e.target.closest('.reply-icon-btn')) {
+          varPopup.style.opacity = '1';
+          varPopup.style.pointerEvents = 'auto';
+          showVarPopup();
+        }
+      });
+    });
+    </script>
+    `;
+
     return `
     <!DOCTYPE html>
     <html lang="en">
@@ -593,6 +691,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
     </head>
     <body>
         ${bodyContent}
+        ${sharedPopupAndScript}
         <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
         <script>lucide.createIcons();</script>
     </body>
@@ -604,7 +703,7 @@ const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
 // Helper function to truncate text
 function trimText(txt, wordLimit) {
     if (!txt) return '';
-    const words = txt.trim().split(/\s+/);
+    const words = txt.trim().split(/\s+/); // Split by one or more spaces
     return words.length > wordLimit ? words.slice(0, wordLimit).join(" ") + "..." : txt;
 }
 
@@ -833,7 +932,7 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
         </div>
     </div>
     `;
-    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Dashboard', dashboardContent, false, true));
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Dashboard', dashboardContent, false, true)); // Pass true for dashboard styles
 });
 
 // -- Logout
@@ -880,7 +979,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
                   <option value="exact_match">Exact Match</option>
                   <option value="pattern_matching">Pattern Matching</option>
                   <option value="expert_pattern_matching">Expert Regex</option>
-                  <option value="welcome_message">Welcome Message</option>
+                  <option value="welcome_message">Welcome Message</p>
                   <option value="default_message">Default Message</option>
               </select>
             </div>
@@ -897,13 +996,14 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
             <label for="replies">Replies (use &lt;#&gt; between lines):</label>
             <div class="reply-area">
               <textarea name="replies" id="replies" required></textarea>
-              <button type="button" id="insertVarBtn" title="Insert Variable" class="reply-icon-btn">
+              <button type="button" class="reply-icon-btn" title="Insert Variable">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
                   <polyline points="3 8 12 13 21 8"/>
                 </svg>
               </button>
             </div>
+
             <label for="priority">Priority:</label>
             <input type="number" name="priority" id="priority" value="0" />
 
@@ -921,18 +1021,6 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         </form>
     </div>
 
-    <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center; opacity:0; pointer-events: none;">
-      <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:240px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
-        <div style="font-size:18px; font-weight:600; margin-bottom:10px; color:#7d38a8;">Variables</div>
-        <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:6px 10px;margin-bottom:12px;font-size:15px;border:1.2px solid #eee;border-radius:6px; box-sizing:border-box;">
-        <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:180px; overflow:auto;">
-          </ul>
-        <div style="margin-top:14px; text-align:right;">
-          <button id="varCloseBtn" style="padding:7px 16px; background:#f7f3ff; border-radius:7px; border:none; color:#a654eb; font-weight:600; font-size:15px; cursor:pointer;">Cancel</button>
-        </div>
-      </div>
-    </div>
-
     <script>
     function handleTypeChange() {
         const type = document.getElementById('type').value;
@@ -947,84 +1035,8 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         if (type === 'default_message') isDefaultField.style.display = 'block';
     }
 
-    // Client-side JS for variable insertion
-    const defaultVars = [
-        "%message%", "%message_LENGTH%", "%capturing_group_ID%",
-        "%name%", "%first_name%", "%last_name%", "%chat_name%", "%rule_id%",
-        "%date%", "%time%", "%hour%", "%minute%", "%second%", "%am/pm%", "%day_of_month%", "%month%", "%year%",
-        "%rndm_num_MIN_MAX%", "%rndm_custom_COUNT_ITEM1,ITEM2,ITEM3%", "%rndm_abc_lower_LEN%",
-        "%rndm_abc_upper_LEN%", "%rndm_alnum_LEN%", "%rndm_ascii_LEN%", "%rndm_grawlix_LEN%"
-    ];
-    // Custom variables are injected from the server
+    // Custom variables are injected from the server for this specific page
     window.customVars = ${customVarsJsArray};
-
-    const allVars = [...defaultVars, ...window.customVars];
-
-    // Popup Open/Close
-    const varPopup = document.getElementById('varPopup');
-    document.getElementById('insertVarBtn').onclick = () => {
-      varPopup.style.opacity = '1';
-      varPopup.style.pointerEvents = 'auto';
-      showVarPopup();
-    };
-    document.getElementById('varCloseBtn').onclick = () => {
-      varPopup.style.opacity = '0';
-      varPopup.style.pointerEvents = 'none';
-      // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
-    };
-
-    function showVarPopup() {
-      renderVarList('');
-      // varPopup.style.display = 'flex'; // Handled by opacity/pointer-events for smooth transition
-      document.getElementById('varSearch').value = '';
-      document.getElementById('varSearch').focus();
-    }
-    // function closeVarPopup() { // Moved to onclick of closeVarBtn to handle animation
-    //   // varPopup.style.display = 'none'; // Handled by opacity/pointer-events for smooth transition
-    // }
-
-    // Render List
-    function renderVarList(filter) {
-      const list = document.getElementById('varList');
-      list.innerHTML = '';
-      allVars
-        .filter(v => v.toLowerCase().includes(filter.toLowerCase()))
-        .forEach(v => {
-          const li = document.createElement('li');
-          li.textContent = v;
-          li.style.cssText = "padding:8px 12px; cursor:pointer; border-radius:6px; font-size:16px; color:#7d38a8;";
-          li.onmouseover = () => li.style.background = "#f3eaff";
-          li.onmouseout = () => li.style.background = "";
-          li.onclick = () => insertVarToReply(v);
-          list.appendChild(li);
-        });
-    }
-    document.getElementById('varSearch').oninput = function() {
-      renderVarList(this.value);
-    }
-
-    // Insert to textarea at cursor position
-    function insertVarToReply(variable) {
-      const textarea = document.getElementById('replies');
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const value = textarea.value;
-      textarea.value = value.substring(0, start) + variable + value.substring(end);
-      textarea.selectionStart = textarea.selectionEnd = start + variable.length;
-      textarea.focus();
-      varPopup.style.opacity = '0'; // Smooth fade out
-      varPopup.style.pointerEvents = 'none';
-      // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
-    }
-
-    // ESC key closes popup
-    document.addEventListener('keydown', function(e){
-      if(varPopup.style.pointerEvents == 'auto' && e.key === 'Escape'){ // Check pointer-events to see if popup is active
-        varPopup.style.opacity = '0';
-        varPopup.style.pointerEvents = 'none';
-        // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
-      }
-    });
     </script>
     `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Chat Reply', addReplyForm, true));
@@ -1062,13 +1074,15 @@ function getReplyIcon(r) {
 }
 
 // Function to truncate text to a word limit
-function truncateWords(str, wordLimit) {
-    if (!str) return '';
-    const words = str.trim().split(/\s+/); // Split by one or more spaces
-    return words.length > wordLimit ? words.slice(0, wordLimit).join(" ") + "..." : str;
+function truncateWords(txt, wordLimit) {
+    if (!txt) return '';
+    const words = txt.trim().split(/\s+/); // Split by one or more spaces
+    // Check if the original string or truncated version is shorter
+    const truncatedText = words.slice(0, wordLimit).join(" ");
+    return words.length > wordLimit ? truncatedText + "..." : txt;
 }
 function formatReceive(r) {
-    const text = (r.type === 'exact_match' || r.type === 'pattern_matching') ? r.keyword : (r.type === 'expert_pattern_matching' ? r.pattern : (r.keyword || r.pattern || '-'));
+    const text = (r.type === 'exact_match' || r.type === 'pattern_matching') ? r.keyword : (r.type === 'expert_pattern_matching' ? r.pattern : (r.keyword || r.pattern || ''));
     return truncateWords(text, 4); // Limit to 4 words for receive
 }
 function formatSend(r) {
@@ -1351,13 +1365,14 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 <label for="replies">Replies (use &lt;#&gt; between lines):</label>
                 <div class="reply-area">
                   <textarea name="replies" id="replies" required>${reply.replies.join('<#>')}</textarea>
-                  <button type="button" id="insertVarBtn" title="Insert Variable" class="reply-icon-btn">
+                  <button type="button" class="reply-icon-btn" title="Insert Variable">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
                       <polyline points="3 8 12 13 21 8"/>
                     </svg>
                   </button>
                 </div>
+
                 <label for="priority">Priority:</label>
                 <input type="number" name="priority" id="priority" value="${reply.priority}" />
 
@@ -1375,18 +1390,6 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             </form>
         </div>
 
-        <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center; opacity:0; pointer-events: none;">
-          <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:240px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
-            <div style="font-size:18px; font-weight:600; margin-bottom:10px; color:#7d38a8;">Variables</div>
-            <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:6px 10px;margin-bottom:12px;font-size:15px;border:1.2px solid #eee;border-radius:6px; box-sizing:border-box;">
-            <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:180px; overflow:auto;">
-              </ul>
-            <div style="margin-top:14px; text-align:right;">
-              <button id="varCloseBtn" style="padding:7px 16px; background:#f7f3ff; border-radius:7px; border:none; color:#a654eb; font-weight:600; font-size:15px; cursor:pointer;">Cancel</button>
-            </div>
-          </div>
-        </div>
-
         <script>
         document.addEventListener('DOMContentLoaded', handleTypeChange); // Call on DOM ready
         function handleTypeChange() {
@@ -1402,88 +1405,8 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             if (type === 'default_message') isDefaultField.style.display = 'block';
         }
 
-        // Client-side JS for variable insertion
-        const defaultVars = [
-            "%message%", "%message_LENGTH%", "%capturing_group_ID%",
-            "%name%", "%first_name%", "%last_name%", "%chat_name%", "%rule_id%",
-            "%date%", "%time%", "%hour%", "%minute%", "%second%", "%am/pm%", "%day_of_month%", "%month%", "%year%",
-            "%rndm_num_MIN_MAX%", "%rndm_custom_COUNT_ITEM1,ITEM2,ITEM3%", "%rndm_abc_lower_LEN%",
-            "%rndm_abc_upper_LEN%", "%rndm_alnum_LEN%", "%rndm_ascii_LEN%", "%rndm_grawlix_LEN%"
-        ];
-        // Custom variables are injected from the server
+        // Custom variables are injected from the server for this specific page
         window.customVars = ${customVarsJsArray};
-
-        const allVars = [...defaultVars, ...window.customVars];
-
-        // Popup Open/Close
-        const varPopup = document.getElementById('varPopup');
-        document.getElementById('insertVarBtn').onclick = () => {
-          varPopup.style.opacity = '1';
-          varPopup.style.pointerEvents = 'auto';
-          showVarPopup();
-        };
-        document.getElementById('varCloseBtn').onclick = () => {
-          varPopup.style.opacity = '0';
-          varPopup.style.pointerEvents = 'none';
-          // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
-        };
-
-        function showVarPopup() {
-          renderVarList('');
-          // varPopup.style.display = 'flex'; // Handled by opacity/pointer-events for smooth transition
-          document.getElementById('varSearch').value = '';
-          document.getElementById('varSearch').focus();
-        }
-        // function closeVarPopup() { // Moved to onclick of closeVarBtn to handle animation
-        //   // varPopup.style.display = 'none'; // Handled by opacity/pointer-events for smooth transition
-        // }
-
-        // Render List
-        function renderVarList(filter) {
-          const list = document.getElementById('varList');
-          list.innerHTML = '';
-          allVars
-            .filter(v => v.toLowerCase().includes(filter.toLowerCase()))
-            .forEach(v => {
-              const li = document.createElement('li');
-              li.textContent = v;
-              li.style.cssText = "padding:8px 12px; cursor:pointer; border-radius:6px; font-size:16px; color:#7d38a8;";
-              li.onmouseover = () => li.style.background = "#f3eaff";
-              li.onmouseout = () => li.style.background = "";
-              li.onclick = () => insertVarToReply(v);
-              list.appendChild(li);
-            });
-        }
-        document.getElementById('varSearch').oninput = function() {
-          renderVarList(this.value);
-        }
-
-        // Insert to textarea at cursor position
-        function insertVarToReply(variable) {
-          const textarea = document.getElementById('replies');
-          const start = textarea.selectionStart;
-          const end = textarea.selectionEnd;
-          const value = textarea.value;
-          textarea.value = value.substring(0, start) + variable + value.substring(end);
-          textarea.selectionStart = textarea.selectionEnd = start + variable.length;
-          textarea.focus();
-          varPopup.style.opacity = '0'; // Smooth fade out
-          varPopup.style.pointerEvents = 'none';
-          // closeVarPopup(); // This is implicitly handled by the opacity/pointer-events toggle
-        }
-
-        // ESC key closes popup
-        document.addEventListener('keydown', function(e){
-          if(varPopup.style.pointerEvents == 'auto' && e.key === 'Escape'){ // Check pointer-events to see if popup is active
-            varPopup.style.opacity = '0';
-            varPopup.style.pointerEvents = 'none';
-            // closeVarPopup(); // This is implicitly handled by thegth > 0 || (varPopup.style.display === 'flex' && e.key === 'Escape')) {
-            // varPopup.style.display = 'none';
-        // }
-        // // Close popup if click outside
-        // varPopup.onclick = e => {
-        //     if (e.target === varPopup) closeVarPopup();
-        // };
         </script>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm, true));
