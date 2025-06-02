@@ -495,14 +495,35 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 });
 
 // REPLY LIST
-// ==== REPLY LIST (VIEW ALL REPLIES - CARD STYLE) ====
-// Purane /admin/reply-list ko pura hatao, yeh neeche ka code paste karo
+   // ======= Helper Functions (file ke upar ya neeche paste kar) =======
+
+function getReplyIcon(r) {
+    if (r.type && r.type.includes('react')) return "😂";
+    if (r.type === 'exact_match') return "🎯";
+    if (r.type === 'pattern_matching') return "🧩";
+    if (r.type === 'expert_pattern_matching') return "🧠";
+    if (r.type === 'welcome_message') return "👋";
+    if (r.type === 'default_message') return "💬";
+    return "";
+}
+function formatReceive(r) {
+    if (r.type === 'exact_match' || r.type === 'pattern_matching') {
+        return r.keyword || '-';
+    }
+    if (r.type === 'expert_pattern_matching') {
+        return r.pattern || '-';
+    }
+    return (r.keyword || r.pattern || '-');
+}
+function formatSend(r) {
+    return (r.replies || []).join('<#>').slice(0, 600) + ((r.replies.join('<#>').length > 600) ? ' ...' : '');
+}
+
+// ========== Stylish /admin/reply-list Route ==========
 
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
-    // Mongoose se saare replies le aa
     const replies = await ChatReply.find().sort({ priority: -1 });
 
-    // Har reply ke liye ek card banao (screenshot jaise)
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
@@ -530,7 +551,6 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
         </div>
     `).join('');
 
-    // Pure list + CSS ke sath render karo
     const content = `
         <div class="nobita-reply-panel">
             <h2 class="nobita-title">REPLY LIST</h2>
@@ -645,34 +665,8 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
             .btn.back:hover { background: #ffc952; color: #282836; }
         </style>
     `;
-
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content));
-
-    // ============ Helper functions ===============
-    function getReplyIcon(r) {
-        if (r.type && r.type.includes('react')) return "😂";
-        if (r.type === 'exact_match') return "🎯";
-        if (r.type === 'pattern_matching') return "🧩";
-        if (r.type === 'expert_pattern_matching') return "🧠";
-        if (r.type === 'welcome_message') return "👋";
-        if (r.type === 'default_message') return "💬";
-        return "";
-    }
-    function formatReceive(r) {
-        if (r.type === 'exact_match' || r.type === 'pattern_matching') {
-            return r.keyword || '-';
-        }
-        if (r.type === 'expert_pattern_matching') {
-            return r.pattern || '-';
-        }
-        return (r.keyword || r.pattern || '-');
-    }
-    function formatSend(r) {
-        return (r.replies || []).join('<#>').slice(0, 600) + ((r.replies.join('<#>').length > 600) ? ' ...' : '');
-    }
 });
-
-
 // EDIT REPLY
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     try {
