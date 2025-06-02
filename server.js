@@ -276,24 +276,31 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
     const MAX_ITERATIONS = 5; // Prevent infinite loops for circular dependencies or complex nesting
 
     while (changed && iterationCount < MAX_ITERATIONS) {
-        changed = false;
-        iterationCount++;
-        try {
-            const customVariables = await CustomVariable.find({});
-            for (const variable of customVariables) {
-                const sanitizedName = variable.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const regex = new RegExp(`%${sanitizedName}%`, 'g');
-                const originalReplyText = replyText;
-                replyText = replyText.replace(regex, variable.value);
-                if (replyText !== originalReplyText) {
-                    changed = true; // Something was replaced, so we might need another pass
-                }
+    changed = false;
+    iterationCount++;
+    try {
+        const customVariables = await CustomVariable.find({});
+        const variableMap = Object.fromEntries(customVariables.map(v => [`%${v.name}%`, v.value]));
+
+        const originalReply = replyText;
+
+        for (const [key, value] of Object.entries(variableMap)) {
+            if (replyText.includes(key)) {
+                const safeValue = value === key ? '' : value; // prevent self reference
+                replyText = replyText.split(key).join(safeValue);
+                changed = true;
             }
-        } catch (error) {
-            console.error("Error fetching custom variables for replacement:", error);
-            break; // Exit loop on error
         }
+
+        if (replyText === originalReply) {
+            changed = false;
+        }
+
+    } catch (error) {
+        console.error("Error fetching custom variables for replacement:", error);
+        break;
     }
+}
     if (iterationCount >= MAX_ITERATIONS) {
         console.warn("Max iterations reached for custom variable replacement. Possible circular dependency or deep nesting.");
     }
@@ -1187,6 +1194,9 @@ app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
 app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
     const { name, value } = req.body;
     try {
+      if (value.includes(`%${name}%`)) {
+        return res.status(400).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>❌ Variable cannot reference itself: <code>%${name}%</code></p><br><a href="/admin/add-custom-variable">Back</a>`));
+    }
         const newVariable = new CustomVariable({ name: name.trim(), value });
         await newVariable.save();
         res.redirect('/admin/custom-variables');
@@ -1239,6 +1249,10 @@ app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => 
 // Edit Custom Variable POST
 app.post('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
     const { value } = req.body; // Name is readonly, so only value can be updated
+    const variable = await CustomVariable.findById(req.params.id);
+    if (value.includes(`%${variable.name}%`)) {
+        return res.status(400).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>❌ Variable cannot reference itself: <code>%${variable.name}%</code></p><br><a href="/admin/edit-custom-variable/${variable._id}">Back</a>`));
+    }
     try {
         await CustomVariable.findByIdAndUpdate(req.params.id, { value });
         res.redirect('/admin/custom-variables');
