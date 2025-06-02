@@ -1,5 +1,4 @@
 // ========== server.js ==========
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
@@ -11,7 +10,7 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- DB URI (change only if needed, env recommended for prod) ---
+// --- DB URI ---
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://dontchange365:DtUiOMFzQVM0tG9l@nobifeedback.9ntuipc.mongodb.net/?retryWrites=true&w=majority&appName=nobifeedback';
 
 // --- Connect MongoDB ---
@@ -133,9 +132,6 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
     replyText = replyText.replace(/%day_of_month%/g, String(now.getDate()).padStart(2, '0'));
     replyText = replyText.replace(/%month%/g, String(now.getMonth() + 1).padStart(2, '0'));
     replyText = replyText.replace(/%year%/g, String(now.getFullYear()));
-
-    // -- Random string/grawlix stuff (optional, add if you want full support) --
-    // .. (Skipping for brevity, add if you need advanced random variables)
     return replyText;
 }
 
@@ -191,9 +187,10 @@ app.post('/api/chatbot/message', async (req, res) => {
     }
     res.json({ reply: botReply });
 });
-// ========== ADMIN ROUTES ==========
 
-// -- Admin Login Page
+// ========== ADMIN ROUTES ==========
+// -- Admin Login Page, Dashboard, Logout (same as before, paste here) --
+// --- Admin Login ---
 app.get('/admin/login', (req, res) => {
     const loginForm = `
     <form method="POST" action="/admin/login">
@@ -219,7 +216,6 @@ app.post('/admin/login', async (req, res) => {
     res.redirect('/admin/dashboard');
 });
 
-// -- Admin Dashboard
 app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     const dashboardContent = `
     <h1>Welcome Admin: ${req.session.username}</h1>
@@ -230,49 +226,22 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
         <li><a href="/admin/logout">🚪 Logout</a></li>
     </ul>
     <style>
-        .admin-links-list {
-            list-style: none;
-            padding: 0;
-            margin: 20px 0;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .admin-links-list li a {
-            display: block;
-            background-color: #4f46e5;
-            color: #fff;
-            padding: 12px 20px;
-            border-radius: 6px;
-            font-size: 16px;
-            text-decoration: none;
-            transition: background 0.3s;
-        }
-        .admin-links-list li a:hover {
-            background-color: #4338ca;
-        }
+        .admin-links-list { list-style: none; padding: 0; margin: 20px 0; display: flex; flex-direction: column; gap: 12px;}
+        .admin-links-list li a { display: block; background-color: #4f46e5; color: #fff; padding: 12px 20px; border-radius: 6px; font-size: 16px; text-decoration: none; transition: background 0.3s;}
+        .admin-links-list li a:hover { background-color: #4338ca; }
     </style>
     `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Dashboard', dashboardContent));
 });
+app.get('/admin/logout', (req, res) => { req.session.destroy(() => res.redirect('/admin/login')); });
 
-// -- Logout
-app.get('/admin/logout', (req, res) => {
-    req.session.destroy(() => res.redirect('/admin/login'));
-});
-
-// -- Add Chat Reply Form
+// ---- Add Chat Reply FORM with DYNAMIC Variables PICKER ----
 app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
-    let customVarList = '';
-    try {
-        const customVariables = await CustomVariable.find({});
-        customVarList = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
-        if (customVarList) {
-            customVarList = `<br>**Custom Variables:** ${customVarList}`;
-        }
-    } catch (e) {
-        console.error("Error fetching custom variables for form:", e);
-    }
+    // --- GET custom variables for JS inject ---
+    const customVariables = await CustomVariable.find({});
+    const customVarArr = customVariables.map(v => `%${v.name}%`);
+    const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
+
     const addReplyForm = `
     <form method="POST" action="/admin/add-chat-replies">
         <label for="ruleName">Rule Name:</label>
@@ -302,7 +271,12 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
             <input name="pattern" id="pattern" placeholder="Only for Expert Regex. Use () for capturing groups." />
         </div>
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-        <textarea name="replies" id="replies" required></textarea>
+        <div style="display:flex;align-items:center;gap:7px;">
+            <textarea name="replies" id="replies" required style="flex:1;"></textarea>
+            <button type="button" title="Insert Variable" onclick="showVariablePicker('replies')" style="background:#252e51;border:none;padding:7px 8px 4px 8px;border-radius:7px;cursor:pointer;display:flex;align-items:center;">
+                <svg width="23" height="23" stroke="#ffd870" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            </button>
+        </div>
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="0" />
         <div id="isDefaultField" style="display:none;">
@@ -312,9 +286,46 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
                 <option value="true">Yes</option>
             </select>
         </div>
-        <button type="submit">Add Reply</button>
+        <button type="submit" style="margin-top:15px;">Add Reply</button>
     </form>
     <script>
+    const availableVars = [
+      "%message%", "%message_LENGTH%", "%capturing_group_ID%",
+      "%name%", "%first_name%", "%last_name%", "%chat_name%",
+      "%date%", "%time%", "%hour%", "%minute%", "%second%", "%am/pm%",
+      "%day_of_month%", "%month%", "%year%", "%rule_id%"
+    ];
+    if (window.customVarListArr) availableVars.push(...window.customVarListArr);
+
+    function showVariablePicker(inputId) {
+      let modal = document.getElementById('varPickerModal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'varPickerModal';
+        modal.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0008;display:flex;align-items:center;justify-content:center;z-index:5000;";
+        modal.innerHTML = \`
+          <div style="background:#181d2f;padding:20px 20px 10px 20px;border-radius:14px;box-shadow:0 8px 32px #000a;width:340px;max-width:94vw;">
+            <h3 style="color:#fff;margin-bottom:10px;font-family:Lexend,Inter,sans-serif;font-size:20px;font-weight:700;letter-spacing:.5px;">Insert Variable</h3>
+            <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px 10px;margin-bottom:16px;">
+              \${availableVars.map(v => \`<button style="padding:6px 10px;border-radius:7px;border:1.5px solid #5b8dff;background:#252e51;color:#ffd870;font-family:Roboto Mono,monospace;font-size:14px;cursor:pointer;" onclick="insertVariable('\${inputId}','\${v.replace(/'/g,"\\\\'")}')">\${v}</button>\`).join('')}
+            </div>
+            <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:7px 18px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:15px;float:right;">Close</button>
+          </div>
+        \`;
+        document.body.appendChild(modal);
+      }
+    }
+    function insertVariable(inputId, value) {
+      const el = document.getElementById(inputId);
+      if (el) {
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        el.value = el.value.substring(0, start) + value + el.value.substring(end);
+        el.focus();
+        el.selectionStart = el.selectionEnd = start + value.length;
+      }
+      document.getElementById('varPickerModal')?.remove();
+    }
     function handleTypeChange() {
         const type = document.getElementById('type').value;
         const keywordField = document.getElementById('keywordField');
@@ -327,7 +338,9 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         if (type === 'expert_pattern_matching') patternField.style.display = 'block';
         if (type === 'default_message') isDefaultField.style.display = 'block';
     }
+    document.addEventListener('DOMContentLoaded', handleTypeChange);
     </script>
+    ${customVarScript}
     `;
     res.set({
         'Content-Type': 'text/html',
@@ -354,7 +367,6 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     await newReply.save();
     res.redirect('/admin/reply-list');
 });
-
 // ======= Helper Functions =======
 function getReplyIcon(r) {
     if (r.type && r.type.includes('react')) return "😂";
@@ -372,9 +384,7 @@ function formatReceive(r) {
 }
 function formatSend(r) {
     let replyText = (r.replies || []).join(' <#> ');
-    // Remove line breaks for preview
     replyText = replyText.replace(/\n/g, ' ');
-    // Split into words
     const words = replyText.split(/\s+/);
     if (words.length <= 20) return replyText;
     return words.slice(0, 20).join(' ') + ' ...';
@@ -426,105 +436,27 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
                 font-weight: 700;
                 font-size: 28px;
             }
-            .nobita-reply-panel {
-                max-width: 600px;
-                margin: 32px auto 60px auto;
-                padding: 0 6px;
-            }
-            .reply-card {
-                background: linear-gradient(98deg, #272733 80%, #3d1153 100%);
-                border: 1.5px solid #d074f9cc;
-                border-radius: 16px;
-                box-shadow: 0 3px 18px #0006;
-                padding: 16px 16px 12px 16px;
-                margin-bottom: 30px;
-                position: relative;
-            }
-            .reply-header {
-                font-size: 19px;
-                font-weight: 700;
-                color: #fff;
-                letter-spacing: 1px;
-                margin-bottom: 12px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            .reply-title {
-                text-transform: uppercase;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-            .reply-inner {
-                background: rgba(34,34,40,0.75);
-                border-radius: 10px;
-                padding: 12px 14px 8px 14px;
-            }
-            .reply-row {
-                display: flex;
-                gap: 8px;
-                align-items: flex-start;
-                margin-bottom: 7px;
-                flex-wrap: wrap;
-            }
-            .reply-label {
-                min-width: 70px;
-                color: #ffc952;
-                font-family: 'Lexend', 'Inter', sans-serif;
-                font-weight: 600;
-                font-size: 15px;
-                letter-spacing: 0.3px;
-            }
+            .nobita-reply-panel { max-width: 600px; margin: 32px auto 60px auto; padding: 0 6px; }
+            .reply-card { background: linear-gradient(98deg, #272733 80%, #3d1153 100%); border: 1.5px solid #d074f9cc; border-radius: 16px; box-shadow: 0 3px 18px #0006; padding: 16px 16px 12px 16px; margin-bottom: 30px; position: relative;}
+            .reply-header { font-size: 19px; font-weight: 700; color: #fff; letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;}
+            .reply-title { text-transform: uppercase; display: flex; align-items: center; gap: 6px;}
+            .reply-inner { background: rgba(34,34,40,0.75); border-radius: 10px; padding: 12px 14px 8px 14px;}
+            .reply-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 7px; flex-wrap: wrap;}
+            .reply-label { min-width: 70px; color: #ffc952; font-family: 'Lexend', 'Inter', sans-serif; font-weight: 600; font-size: 15px; letter-spacing: 0.3px;}
             .reply-label.send { color: #ff6f61; }
             .reply-label.receive { color: #46e579; }
-            .reply-receive, .reply-send {
-                color: #fff;
-                font-family: 'Roboto Mono', monospace;
-                font-size: 15px;
-                white-space: pre-line;
-                word-break: break-all;
-            }
-            hr {
-                border: 0;
-                border-top: 1.5px dashed #b197d6;
-                margin: 8px 0 8px 0;
-            }
-            .reply-actions {
-                position: absolute;
-                top: 14px;
-                right: 20px;
-                display: flex;
-                gap: 10px;
-            }
-            .reply-actions a svg {
-                stroke: #ffc952;
-                background: #232337;
-                border-radius: 6px;
-                padding: 2px;
-                transition: background 0.15s, stroke 0.15s;
-            }
-            .reply-actions a:hover svg {
-                background: #ffc952;
-                stroke: #232337;
-            }
-            .btn.back {
-                background: #282836;
-                color: #ffc952;
-                padding: 10px 22px;
-                border-radius: 7px;
-                text-decoration: none;
-                font-weight: 700;
-                font-size: 16px;
-                margin-left: 0;
-                display: block;
-                width: fit-content;
-            }
+            .reply-receive, .reply-send { color: #fff; font-family: 'Roboto Mono', monospace; font-size: 15px; white-space: pre-line; word-break: break-all;}
+            hr { border: 0; border-top: 1.5px dashed #b197d6; margin: 8px 0 8px 0;}
+            .reply-actions { position: absolute; top: 14px; right: 20px; display: flex; gap: 10px;}
+            .reply-actions a svg { stroke: #ffc952; background: #232337; border-radius: 6px; padding: 2px; transition: background 0.15s, stroke 0.15s;}
+            .reply-actions a:hover svg { background: #ffc952; stroke: #232337;}
+            .btn.back { background: #282836; color: #ffc952; padding: 10px 22px; border-radius: 7px; text-decoration: none; font-weight: 700; font-size: 16px; margin-left: 0; display: block; width: fit-content;}
             .btn.back:hover { background: #ffc952; color: #282836; }
         </style>
     `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content));
 });
+
 // ========== EDIT REPLY ==========
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     try {
@@ -532,14 +464,11 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         if (!reply) {
             return res.status(404).set('Content-Type', 'text/html').send(getHtmlTemplate('Not Found', '<p>Reply not found.</p><br><a href="/admin/reply-list">Back to List</a>'));
         }
-        let customVarList = '';
-        try {
-            const customVariables = await CustomVariable.find({});
-            customVarList = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
-            if (customVarList) {
-                customVarList = `<br>**Custom Variables:** ${customVarList}`;
-            }
-        } catch (e) { console.error("Error fetching custom variables for form:", e); }
+        // Inject custom variables for JS
+        const customVariables = await CustomVariable.find({});
+        const customVarArr = customVariables.map(v => `%${v.name}%`);
+        const customVarScript = `<script>window.customVarListArr = ${JSON.stringify(customVarArr)};</script>`;
+
         const editReplyForm = `
         <form method="POST" action="/admin/edit-reply/${reply._id}">
             <label for="ruleName">Rule Name:</label>
@@ -568,7 +497,12 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Only for Expert Regex. Use () for capturing groups." />
             </div>
             <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-            <textarea name="replies" id="replies" required>${reply.replies.join('<#>')}</textarea>
+            <div style="display:flex;align-items:center;gap:7px;">
+                <textarea name="replies" id="replies" required style="flex:1;">${reply.replies.join('<#>')}</textarea>
+                <button type="button" title="Insert Variable" onclick="showVariablePicker('replies')" style="background:#252e51;border:none;padding:7px 8px 4px 8px;border-radius:7px;cursor:pointer;display:flex;align-items:center;">
+                    <svg width="23" height="23" stroke="#ffd870" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </button>
+            </div>
             <label for="priority">Priority:</label>
             <input type="number" name="priority" id="priority" value="${reply.priority}" />
             <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
@@ -578,11 +512,47 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                     <option value="true" ${reply.isDefault ? 'selected' : ''}>Yes</option>
                 </select>
             </div>
-            <button type="submit">Update Reply</button>
+            <button type="submit" style="margin-top:15px;">Update Reply</button>
         </form>
         <a href="/admin/reply-list">← Back to List</a>
         <script>
-        document.addEventListener('DOMContentLoaded', handleTypeChange);
+        const availableVars = [
+          "%message%", "%message_LENGTH%", "%capturing_group_ID%",
+          "%name%", "%first_name%", "%last_name%", "%chat_name%",
+          "%date%", "%time%", "%hour%", "%minute%", "%second%", "%am/pm%",
+          "%day_of_month%", "%month%", "%year%", "%rule_id%"
+        ];
+        if (window.customVarListArr) availableVars.push(...window.customVarListArr);
+
+        function showVariablePicker(inputId) {
+          let modal = document.getElementById('varPickerModal');
+          if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'varPickerModal';
+            modal.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0008;display:flex;align-items:center;justify-content:center;z-index:5000;";
+            modal.innerHTML = \`
+              <div style="background:#181d2f;padding:20px 20px 10px 20px;border-radius:14px;box-shadow:0 8px 32px #000a;width:340px;max-width:94vw;">
+                <h3 style="color:#fff;margin-bottom:10px;font-family:Lexend,Inter,sans-serif;font-size:20px;font-weight:700;letter-spacing:.5px;">Insert Variable</h3>
+                <div id="pickerList" style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px 10px;margin-bottom:16px;">
+                  \${availableVars.map(v => \`<button style="padding:6px 10px;border-radius:7px;border:1.5px solid #5b8dff;background:#252e51;color:#ffd870;font-family:Roboto Mono,monospace;font-size:14px;cursor:pointer;" onclick="insertVariable('\${inputId}','\${v.replace(/'/g,"\\\\'")}')">\${v}</button>\`).join('')}
+                </div>
+                <button onclick="document.getElementById('varPickerModal').remove()" style="background:#292c36;color:#fff;padding:7px 18px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:15px;float:right;">Close</button>
+              </div>
+            \`;
+            document.body.appendChild(modal);
+          }
+        }
+        function insertVariable(inputId, value) {
+          const el = document.getElementById(inputId);
+          if (el) {
+            const start = el.selectionStart;
+            const end = el.selectionEnd;
+            el.value = el.value.substring(0, start) + value + el.value.substring(end);
+            el.focus();
+            el.selectionStart = el.selectionEnd = start + value.length;
+          }
+          document.getElementById('varPickerModal')?.remove();
+        }
         function handleTypeChange() {
             const type = document.getElementById('type').value;
             const keywordField = document.getElementById('keywordField');
@@ -595,7 +565,9 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             if (type === 'expert_pattern_matching') patternField.style.display = 'block';
             if (type === 'default_message') isDefaultField.style.display = 'block';
         }
+        document.addEventListener('DOMContentLoaded', handleTypeChange);
         </script>
+        ${customVarScript}
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
     } catch (error) {
@@ -640,7 +612,8 @@ app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
 });
 
 // ========== CUSTOM VARIABLE CRUD ==========
-// List
+
+// List all custom variables
 app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
     try {
         const variables = await CustomVariable.find({});
@@ -649,8 +622,12 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
                 <div class="var-header">
                     <div class="var-name">%${v.name}%</div>
                     <div class="var-actions">
-                        <a title="Edit" href="/admin/edit-custom-variable/${v._id}"><svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg></a>
-                        <a title="Delete" href="/admin/delete-custom-variable/${v._id}" onclick="return confirm('Delete this variable?')"><svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg></a>
+                        <a title="Edit" href="/admin/edit-custom-variable/${v._id}">
+                          <svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
+                        </a>
+                        <a title="Delete" href="/admin/delete-custom-variable/${v._id}" onclick="return confirm('Delete this variable?')">
+                          <svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg>
+                        </a>
                     </div>
                 </div>
                 <div class="var-value">${v.value.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
@@ -679,7 +656,8 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading custom variables.</p>'));
     }
 });
-// Add
+
+// Add custom variable form
 app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
     const form = `
         <h2>Add New Custom Variable</h2>
@@ -709,7 +687,8 @@ app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>${errorMessage}</p><br><a href="/admin/add-custom-variable">Try again</a>`));
     }
 });
-// Edit
+
+// Edit custom variable
 app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
     try {
         const variable = await CustomVariable.findById(req.params.id);
@@ -743,7 +722,8 @@ app.post('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) =>
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating custom variable.</p><br><a href="/admin/edit-custom-variable/' + req.params.id + '">Try again</a>'));
     }
 });
-// Delete
+
+// Delete custom variable
 app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) => {
     try {
         await CustomVariable.findByIdAndDelete(req.params.id);
