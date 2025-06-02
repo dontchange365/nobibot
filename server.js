@@ -495,57 +495,181 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 });
 
 // REPLY LIST
+// ==== REPLY LIST (VIEW ALL REPLIES - CARD STYLE) ====
+// Purane /admin/reply-list ko pura hatao, yeh neeche ka code paste karo
+
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
+    // Mongoose se saare replies le aa
     const replies = await ChatReply.find().sort({ priority: -1 });
 
+    // Har reply ke liye ek card banao (screenshot jaise)
     const listItems = replies.map((r, index) => `
-    <li class="reply-item">
-        <strong>${r.ruleName}</strong> (${r.type})
-        ${r.keyword ? ` - Keywords: ${r.keyword}` : ''}
-        ${r.pattern ? ` - Pattern: <code>${r.pattern}</code>` : ''}
-        - Replies: ${r.replies.length} message(s)
-        - Send Method: ${r.sendMethod}
-        - Priority: ${r.priority}
-        <a href="/admin/edit-reply/${r._id}">Edit</a>
-        <a href="/admin/delete-reply/${r._id}" onclick="return confirm('Delete this rule?')">Delete</a>
-    </li>
-`).join('');
+        <div class="reply-card">
+            <div class="reply-header">
+                <span class="reply-title">${r.ruleName.toUpperCase()} ${getReplyIcon(r)}</span>
+            </div>
+            <div class="reply-inner">
+                <div class="reply-row">
+                    <span class="reply-label receive">Receive:</span>
+                    <span class="reply-receive">${formatReceive(r)}</span>
+                </div>
+                <hr>
+                <div class="reply-row">
+                    <span class="reply-label send">Send:</span>
+                    <span class="reply-send">${formatSend(r)}</span>
+                </div>
+            </div>
+            <div class="reply-actions">
+                <a href="/admin/edit-reply/${r._id}" title="Edit">
+                  <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
+                </a>
+                <a href="/admin/delete-reply/${r._id}" title="Delete" onclick="return confirm('Delete this rule?')">
+                  <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg>
+                </a>
+            </div>
+        </div>
+    `).join('');
 
+    // Pure list + CSS ke sath render karo
     const content = `
-    <h2>Chat Reply List</h2>
-    <ul class="reply-list">${listItems}</ul>
-    <a href="/admin/dashboard">← Back to Dashboard</a>
-    <style>
-        .reply-list {
-            list-style: none;
-            padding: 0;
-            margin: 20px 0;
-        }
-        .reply-list li {
-            background: #f9f9f9;
-            border: 1px solid #ddd;
-            padding: 10px 15px;
-            margin-bottom: 8px;
-            border-radius: 5px;
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .reply-list li strong {
-            margin-right: 10px;
-            color: #333;
-        }
-        .reply-list li a {
-            margin-left: 15px;
-            text-decoration: none;
-            color: #2563eb;
-        }
-        .reply-list li a:hover {
-            text-decoration: underline;
-        }
-    </style>
+        <div class="nobita-reply-panel">
+            <h2 class="nobita-title">REPLY LIST</h2>
+            ${listItems || '<em>No replies found.</em>'}
+            <a class="btn back" href="/admin/dashboard" style="margin-top:24px;">← Back to Dashboard</a>
+        </div>
+        <style>
+            body { background: #1a1a1a; }
+            .nobita-title {
+                color: #fff;
+                font-family: 'Lexend', 'Inter', sans-serif;
+                letter-spacing: 1px;
+                margin-bottom: 24px;
+                text-align: center;
+                font-weight: 700;
+                font-size: 28px;
+            }
+            .nobita-reply-panel {
+                max-width: 600px;
+                margin: 32px auto 60px auto;
+                padding: 0 6px;
+            }
+            .reply-card {
+                background: linear-gradient(98deg, #272733 80%, #3d1153 100%);
+                border: 1.5px solid #d074f9cc;
+                border-radius: 16px;
+                box-shadow: 0 3px 18px #0006;
+                padding: 16px 16px 12px 16px;
+                margin-bottom: 30px;
+                position: relative;
+            }
+            .reply-header {
+                font-size: 19px;
+                font-weight: 700;
+                color: #fff;
+                letter-spacing: 1px;
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .reply-title {
+                text-transform: uppercase;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .reply-inner {
+                background: rgba(34,34,40,0.75);
+                border-radius: 10px;
+                padding: 12px 14px 8px 14px;
+            }
+            .reply-row {
+                display: flex;
+                gap: 8px;
+                align-items: flex-start;
+                margin-bottom: 7px;
+                flex-wrap: wrap;
+            }
+            .reply-label {
+                min-width: 70px;
+                color: #ffc952;
+                font-family: 'Lexend', 'Inter', sans-serif;
+                font-weight: 600;
+                font-size: 15px;
+                letter-spacing: 0.3px;
+            }
+            .reply-label.send { color: #ff6f61; }
+            .reply-label.receive { color: #46e579; }
+            .reply-receive, .reply-send {
+                color: #fff;
+                font-family: 'Roboto Mono', monospace;
+                font-size: 15px;
+                white-space: pre-line;
+                word-break: break-all;
+            }
+            hr {
+                border: 0;
+                border-top: 1.5px dashed #b197d6;
+                margin: 8px 0 8px 0;
+            }
+            .reply-actions {
+                position: absolute;
+                top: 14px;
+                right: 20px;
+                display: flex;
+                gap: 10px;
+            }
+            .reply-actions a svg {
+                stroke: #ffc952;
+                background: #232337;
+                border-radius: 6px;
+                padding: 2px;
+                transition: background 0.15s, stroke 0.15s;
+            }
+            .reply-actions a:hover svg {
+                background: #ffc952;
+                stroke: #232337;
+            }
+            .btn.back {
+                background: #282836;
+                color: #ffc952;
+                padding: 10px 22px;
+                border-radius: 7px;
+                text-decoration: none;
+                font-weight: 700;
+                font-size: 16px;
+                margin-left: 0;
+                display: block;
+                width: fit-content;
+            }
+            .btn.back:hover { background: #ffc952; color: #282836; }
+        </style>
     `;
-    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Chat Reply List', content));
+
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content));
+
+    // ============ Helper functions ===============
+    function getReplyIcon(r) {
+        if (r.type && r.type.includes('react')) return "😂";
+        if (r.type === 'exact_match') return "🎯";
+        if (r.type === 'pattern_matching') return "🧩";
+        if (r.type === 'expert_pattern_matching') return "🧠";
+        if (r.type === 'welcome_message') return "👋";
+        if (r.type === 'default_message') return "💬";
+        return "";
+    }
+    function formatReceive(r) {
+        if (r.type === 'exact_match' || r.type === 'pattern_matching') {
+            return r.keyword || '-';
+        }
+        if (r.type === 'expert_pattern_matching') {
+            return r.pattern || '-';
+        }
+        return (r.keyword || r.pattern || '-');
+    }
+    function formatSend(r) {
+        return (r.replies || []).join('<#>').slice(0, 600) + ((r.replies.join('<#>').length > 600) ? ' ...' : '');
+    }
 });
 
 
