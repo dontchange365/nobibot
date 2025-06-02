@@ -265,6 +265,78 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Dashboard', dashboardContent));
 });
 app.get('/admin/logout', (req, res) => { req.session.destroy(() => res.redirect('/admin/login')); });
+
+// ========== VIEW ALL CHAT REPLIES ==========
+app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
+    try {
+        const replies = await ChatReply.find({}).sort({ priority: -1, ruleName: 1 });
+        let listHtml = `
+            <h2 style="margin-top:0;">All Chat Replies</h2>
+            <a href="/admin/add-chat-replies" class="btn" style="margin-bottom:14px;display:inline-block;">➕ Add New Reply</a>
+            <table border="0" cellpadding="10" style="width:100%;max-width:900px;margin:auto;background:#fff;border-radius:12px;">
+            <thead>
+                <tr style="background:#efecff;">
+                    <th>Rule Name</th>
+                    <th>Type</th>
+                    <th>Keyword / Pattern</th>
+                    <th>Replies</th>
+                    <th>Send Method</th>
+                    <th>Priority</th>
+                    <th>Default</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+        `;
+        if (replies.length === 0) {
+            listHtml += `<tr><td colspan="8" style="text-align:center; padding: 20px;">No chat replies found. Add one!</td></tr>`;
+        } else {
+            for (let rep of replies) {
+                listHtml += `
+                    <tr>
+                        <td>${rep.ruleName}</td>
+                        <td>${rep.type}</td>
+                        <td>${rep.keyword || rep.pattern || ''}</td>
+                        <td style="max-width:220px;font-size:15px;">${rep.replies.map(r => `<div style="background:#f4f1ff;padding:5px 10px;border-radius:7px;margin-bottom:2px;color:#222;">${r.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`).join('')}</td>
+                        <td>${rep.sendMethod}</td>
+                        <td>${rep.priority}</td>
+                        <td>${rep.isDefault ? '✅' : ''}</td>
+                        <td>
+                            <a href="/admin/edit-reply/${rep._id}" style="color:#3a82fa;font-weight:bold;text-decoration:none;">Edit</a> | 
+                            <a href="/admin/delete-reply/${rep._id}" onclick="return confirm('Delete this reply?')" style="color:#e53131;font-weight:bold;text-decoration:none;">Delete</a>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+        listHtml += `</tbody></table>
+        <a href="/admin/dashboard" class="btn back" style="margin-top:22px;display:inline-block;">← Back to Dashboard</a>
+        <style>
+            table { border-collapse: separate; border-spacing: 0; } /* Ensures rounded corners work */
+            table th, table td { padding: 9px 10px; border-bottom: 1px solid #ececec; }
+            table thead tr { border-bottom: 2px solid #ddd; } /* Thicker line for header */
+            table th { background: #ede7fe; color: #482998; font-weight:700; text-align: left;} /* Align header text left */
+            table tr:last-child td { border-bottom:none; } /* No border for last row */
+            table thead tr:first-child th:first-child { border-top-left-radius: 12px; } /* Top-left corner for header */
+            table thead tr:first-child th:last-child { border-top-right-radius: 12px; } /* Top-right corner for header */
+
+            .btn.back { background:#e6eaff;color:#444;padding:8px 23px;border-radius:8px;border:none;font-size:17px;font-weight:600; text-decoration: none;}
+            .btn.back:hover { background:#d0d7f0; } /* Hover for back button */
+            .btn { /* General button style if not already defined for + Add New Reply */
+                background:#296aff;color:#fff;font-weight:700;font-size:18px;border:none;border-radius:8px;padding:10px 20px;text-decoration:none;
+                transition: background 0.2s ease-in-out;
+            }
+            .btn:hover { background:#1e53e0; }
+        </style>
+        `;
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('View Chat Replies', listHtml));
+    } catch (err) {
+        console.error('Error fetching reply list:', err);
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading reply list.</p>'));
+    }
+});
+
+
 // ---- Add Chat Reply FORM with DYNAMIC Variables PICKER ----
 app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const customVariables = await CustomVariable.find({});
