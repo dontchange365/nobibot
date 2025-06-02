@@ -1193,6 +1193,9 @@ app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
 // Add Custom Variable POST
 app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
     const { name, value } = req.body;
+    if (value.includes(`%${name}%`)) {
+    return res.status(400).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>❌ Variable cannot reference itself: <code>%${name}%</code></p><br><a href="/admin/custom-variables">Back</a>`));
+  }
     try {
       if (value.includes(`%${name}%`)) {
         return res.status(400).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>❌ Variable cannot reference itself: <code>%${name}%</code></p><br><a href="/admin/add-custom-variable">Back</a>`));
@@ -1200,6 +1203,9 @@ app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
         const newVariable = new CustomVariable({ name: name.trim(), value });
         await newVariable.save();
         res.redirect('/admin/custom-variables');
+        if (value.includes(`%${variable.name}%`)) {
+      return res.status(400).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>❌ Variable cannot reference itself: <code>%${variable.name}%</code></p><br><a href="/admin/edit-custom-variable/${variable._id}">Back</a>`));
+    }
     } catch (error) {
         console.error('Error adding custom variable:', error);
         let errorMessage = 'Error adding custom variable.';
