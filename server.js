@@ -186,6 +186,7 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
     replyText = replyText.replace(/%first_name%/g, userName.split(' ')[0] || '');
     replyText = replyText.replace(/%last_name%/g, userName.split(' ').slice(1).join(' ') || '');
     replyText = replyText.replace(/%chat_name%/g, userName);
+    replyText = replyText.replace(/%rule_id%/g, replyObj._id ? replyObj._id.toString() : ''); // Added rule_id
 
     // Date & time variables
     const optionsDate = { year: 'numeric', month: 'long', day: 'numeric' };
@@ -327,16 +328,20 @@ app.get('/admin/logout', (req, res) => {
 
 // -- Add Chat Reply Form
 app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
-    let customVarList = '';
+    let customVarListHtml = '';
+    let customVarsJsArray = '[]';
     try {
         const customVariables = await CustomVariable.find({});
-        customVarList = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
-        if (customVarList) {
-            customVarList = `<br>**Custom Variables:** ${customVarList}`;
+        customVarListHtml = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
+        if (customVarListHtml) {
+            customVarListHtml = `<br>**Custom Variables:** ${customVarListHtml}`;
         }
+        // Prepare JS array for client-side
+        customVarsJsArray = JSON.stringify(customVariables.map(v => `%${v.name}%`));
     } catch (e) {
         console.error("Error fetching custom variables for form:", e);
     }
+
     const addReplyForm = `
     <form method="POST" action="/admin/add-chat-replies">
         <label for="ruleName">Rule Name:</label>
@@ -366,14 +371,23 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
             <input name="pattern" id="pattern" placeholder="Only for Expert Regex. Use () for capturing groups." />
         </div>
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-        <textarea name="replies" id="replies" required></textarea>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <textarea name="replies" id="replies" required style="flex: 1"></textarea>
+          <button type="button" id="insertVarBtn" title="Insert Variable" style="padding: 7px 10px; border-radius:7px; border:none; background:#e7e1fa; cursor:pointer;">
+            <svg width="20" height="20" stroke="#7d38a8" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="4" width="16" height="12" rx="4" />
+              <path d="M8 9v2" />
+              <path d="M12 9v2" />
+            </svg>
+          </button>
+        </div>
         <small>
             **Available replacements:**<br>
             **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
             **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
             **Date & Time:** %date%, %time%, %hour%, %minute%, %second%, %am/pm%, %day_of_month%, %month%, %year%<br>
             **AutoResponder:** %rule_id%<br>
-            ${customVarList}
+            ${customVarListHtml}
         </small>
         <label for="priority">Priority:</label>
         <input type="number" name="priority" id="priority" value="0" />
@@ -386,6 +400,19 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         </div>
         <button type="submit">Add Reply</button>
     </form>
+
+    <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center;">
+      <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:270px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
+        <div style="font-size:20px; font-weight:700; margin-bottom:12px; color:#7d38a8;">Insert Variable</div>
+        <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:7px 12px;margin-bottom:14px;font-size:16px;border:1.2px solid #ddd;border-radius:6px;">
+        <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:240px; overflow:auto;">
+          </ul>
+        <div style="margin-top:18px; text-align:right;">
+          <button id="varCloseBtn" style="padding:8px 19px; background:#f7f3ff; border-radius:7px; border:none; color:#a654eb; font-weight:600; font-size:16px; cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <script>
     function handleTypeChange() {
         const type = document.getElementById('type').value;
@@ -399,6 +426,74 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         if (type === 'expert_pattern_matching') patternField.style.display = 'block';
         if (type === 'default_message') isDefaultField.style.display = 'block';
     }
+
+    // Client-side JS for variable insertion
+    const defaultVars = [
+        "%message%", "%message_LENGTH%", "%capturing_group_ID%",
+        "%name%", "%first_name%", "%last_name%", "%chat_name%", "%rule_id%",
+        "%date%", "%time%", "%hour%", "%minute%", "%second%", "%am/pm%", "%day_of_month%", "%month%", "%year%",
+        "%rndm_num_MIN_MAX%", "%rndm_custom_COUNT_ITEM1,ITEM2,ITEM3%", "%rndm_abc_lower_LEN%",
+        "%rndm_abc_upper_LEN%", "%rndm_alnum_LEN%", "%rndm_ascii_LEN%", "%rndm_grawlix_LEN%"
+    ];
+    // Custom variables are injected from the server
+    window.customVars = ${customVarsJsArray};
+
+    const allVars = [...defaultVars, ...window.customVars];
+
+    // Popup Open/Close
+    document.getElementById('insertVarBtn').onclick = () => {
+      showVarPopup();
+    };
+    document.getElementById('varCloseBtn').onclick = closeVarPopup;
+
+    function showVarPopup() {
+      renderVarList('');
+      document.getElementById('varPopup').style.display = 'flex';
+      document.getElementById('varSearch').value = '';
+      document.getElementById('varSearch').focus();
+    }
+    function closeVarPopup() {
+      document.getElementById('varPopup').style.display = 'none';
+    }
+
+    // Render List
+    function renderVarList(filter) {
+      const list = document.getElementById('varList');
+      list.innerHTML = '';
+      allVars
+        .filter(v => v.toLowerCase().includes(filter.toLowerCase()))
+        .forEach(v => {
+          const li = document.createElement('li');
+          li.textContent = v;
+          li.style.cssText = "padding:8px 12px; cursor:pointer; border-radius:6px; font-size:16px; color:#7d38a8;";
+          li.onmouseover = () => li.style.background = "#f3eaff";
+          li.onmouseout = () => li.style.background = "";
+          li.onclick = () => insertVarToReply(v);
+          list.appendChild(li);
+        });
+    }
+    document.getElementById('varSearch').oninput = function() {
+      renderVarList(this.value);
+    }
+
+    // Insert to textarea at cursor position
+    function insertVarToReply(variable) {
+      const textarea = document.getElementById('replies');
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
+      textarea.value = value.substring(0, start) + variable + value.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+      textarea.focus();
+      closeVarPopup();
+    }
+
+    // ESC key closes popup
+    document.addEventListener('keydown', function(e){
+      if(document.getElementById('varPopup').style.display == 'flex' && e.key === 'Escape'){
+        closeVarPopup();
+      }
+    });
     </script>
     `;
     res.set({
@@ -452,21 +547,21 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
-                <span class="reply-title">${(r.ruleName || 'Untitled').toUpperCase()} <span class="math-inline">\{getReplyIcon\(r\)\}</span\>
-</div\>
-<div class\="reply\-inner"\>
-<div class\="reply\-row"\>
-<span class\="reply\-label receive"\>Receive\:</span\>
-<span class\="reply\-receive"\></span>{formatReceive(r)}</span>
+                <span class="reply-title">${(r.ruleName || 'Untitled').toUpperCase()} ${getReplyIcon(r)}</span>
+            </div>
+            <div class="reply-inner">
+                <div class="reply-row">
+                    <span class="reply-label receive">Receive:</span>
+                    <span class="reply-receive">${formatReceive(r)}</span>
                 </div>
                 <hr>
                 <div class="reply-row">
                     <span class="reply-label send">Send:</span>
-                    <span class="reply-send"><span class="math-inline">\{formatSend\(r\)\}</span\>
-</div\>
-</div\>
-<div class\="reply\-actions"\>
-<a href\="/admin/edit\-reply/</span>{r._id}" title="Edit">
+                    <span class="reply-send">${formatSend(r)}</span>
+                </div>
+            </div>
+            <div class="reply-actions">
+                <a href="/admin/edit-reply/${r._id}" title="Edit">
                   <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
                 </a>
                 <a href="/admin/delete-reply/${r._id}" title="Delete" onclick="return confirm('Delete this rule?')">
@@ -598,18 +693,22 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         if (!reply) {
             return res.status(404).set('Content-Type', 'text/html').send(getHtmlTemplate('Not Found', '<p>Reply not found.</p><br><a href="/admin/reply-list">Back to List</a>'));
         }
-        let customVarList = '';
+        let customVarListHtml = '';
+        let customVarsJsArray = '[]';
         try {
             const customVariables = await CustomVariable.find({});
-            customVarList = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
-            if (customVarList) {
-                customVarList = `<br>**Custom Variables:** ${customVarList}`;
+            customVarListHtml = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
+            if (customVarListHtml) {
+                customVarListHtml = `<br>**Custom Variables:** ${customVarListHtml}`;
             }
+            // Prepare JS array for client-side
+            customVarsJsArray = JSON.stringify(customVariables.map(v => `%${v.name}%`));
         } catch (e) { console.error("Error fetching custom variables for form:", e); }
+
         const editReplyForm = `
-        <form method="POST" action="/admin/edit-reply/<span class="math-inline">\{reply\.\_id\}"\>
-<label for\="ruleName"\>Rule Name\:</label\>
-<input name\="ruleName" id\="ruleName" value\="</span>{reply.ruleName}" required />
+        <form method="POST" action="/admin/edit-reply/${reply._id}">
+            <label for="ruleName">Rule Name:</label>
+            <input name="ruleName" id="ruleName" value="${reply.ruleName}" required />
             <label for="sendMethod">Send Method:</label>
             <select name="sendMethod" id="sendMethod">
                 <option value="random" ${reply.sendMethod === 'random' ? 'selected' : ''}>Random</option>
@@ -623,28 +722,37 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 <option value="pattern_matching" ${reply.type === 'pattern_matching' ? 'selected' : ''}>Pattern Matching</option>
                 <option value="expert_pattern_matching" ${reply.type === 'expert_pattern_matching' ? 'selected' : ''}>Expert Regex</option>
                 <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
-                <option value="default_message" <span class="math-inline">\{reply\.type \=\=\= 'default\_message' ? 'selected' \: ''\}\>Default Message</option\>
-</select\>
-<div id\="keywordField" style\="</span>{(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
+                <option value="default_message" ${reply.type === 'default_message' ? 'selected' : ''}>Default Message</option>
+            </select>
+            <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
                 <label for="keyword">Keyword(s):</label>
-                <input name="keyword" id="keyword" value="<span class="math-inline">\{reply\.keyword \|\| ''\}" placeholder\="e\.g\. hi, hello" /\>
-</div\>
-<div id\="patternField" style\="</span>{reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
+                <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
+            </div>
+            <div id="patternField" style="${reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
                 <label for="pattern">Regex Pattern:</label>
-                <input name="pattern" id="pattern" value="<span class="math-inline">\{reply\.pattern \|\| ''\}" placeholder\="Only for Expert Regex\. Use \(\) for capturing groups\." /\>
-</div\>
-<label for\="replies"\>Replies \(use &lt;\#&gt; between lines\)\:</label\>
-<textarea name\="replies" id\="replies" required\></span>{reply.replies.join('<#>')}</textarea>
+                <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Only for Expert Regex. Use () for capturing groups." />
+            </div>
+            <label for="replies">Replies (use &lt;#&gt; between lines):</label>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <textarea name="replies" id="replies" required style="flex: 1">${reply.replies.join('<#>')}</textarea>
+              <button type="button" id="insertVarBtn" title="Insert Variable" style="padding: 7px 10px; border-radius:7px; border:none; background:#e7e1fa; cursor:pointer;">
+                <svg width="20" height="20" stroke="#7d38a8" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="4" width="16" height="12" rx="4" />
+                  <path d="M8 9v2" />
+                  <path d="M12 9v2" />
+                </svg>
+              </button>
+            </div>
             <small>
                 **Available replacements:**<br>
                 **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
                 **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
                 **Date & Time:** %date%, %time%, %hour%, %minute%, %second%, %am/pm%, %day_of_month%, %month%, %year%<br>
                 **AutoResponder:** %rule_id%<br>
-                <span class="math-inline">\{customVarList\}
-</small\>
-<label for\="priority"\>Priority\:</label\>
-<input type\="number" name\="priority" id\="priority" value\="</span>{reply.priority}" />
+                ${customVarListHtml}
+            </small>
+            <label for="priority">Priority:</label>
+            <input type="number" name="priority" id="priority" value="${reply.priority}" />
             <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
                 <label for="isDefault">Is Default?</label>
                 <select name="isDefault" id="isDefault">
@@ -655,8 +763,21 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             <button type="submit">Update Reply</button>
         </form>
         <a href="/admin/reply-list">← Back to List</a>
+
+        <div id="varPopup" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0005; z-index:99; align-items:center; justify-content:center;">
+          <div style="background:#fff; border-radius:14px; padding:26px 24px; min-width:270px; max-width:95vw; max-height:90vh; box-shadow:0 4px 28px #55318c44; overflow:auto;">
+            <div style="font-size:20px; font-weight:700; margin-bottom:12px; color:#7d38a8;">Insert Variable</div>
+            <input type="text" id="varSearch" placeholder="Search variable..." style="width:100%;padding:7px 12px;margin-bottom:14px;font-size:16px;border:1.2px solid #ddd;border-radius:6px;">
+            <ul id="varList" style="list-style:none; margin:0; padding:0; max-height:240px; overflow:auto;">
+              </ul>
+            <div style="margin-top:18px; text-align:right;">
+              <button id="varCloseBtn" style="padding:8px 19px; background:#f7f3ff; border-radius:7px; border:none; color:#a654eb; font-weight:600; font-size:16px; cursor:pointer;">Cancel</button>
+            </div>
+          </div>
+        </div>
+
         <script>
-        document.addEventListener('DOMContentLoaded', handleTypeChange);
+        document.addEventListener('DOMContentLoaded', handleTypeChange); // Call on DOM ready
         function handleTypeChange() {
             const type = document.getElementById('type').value;
             const keywordField = document.getElementById('keywordField');
@@ -669,6 +790,74 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             if (type === 'expert_pattern_matching') patternField.style.display = 'block';
             if (type === 'default_message') isDefaultField.style.display = 'block';
         }
+
+        // Client-side JS for variable insertion
+        const defaultVars = [
+            "%message%", "%message_LENGTH%", "%capturing_group_ID%",
+            "%name%", "%first_name%", "%last_name%", "%chat_name%", "%rule_id%",
+            "%date%", "%time%", "%hour%", "%minute%", "%second%", "%am/pm%", "%day_of_month%", "%month%", "%year%",
+            "%rndm_num_MIN_MAX%", "%rndm_custom_COUNT_ITEM1,ITEM2,ITEM3%", "%rndm_abc_lower_LEN%",
+            "%rndm_abc_upper_LEN%", "%rndm_alnum_LEN%", "%rndm_ascii_LEN%", "%rndm_grawlix_LEN%"
+        ];
+        // Custom variables are injected from the server
+        window.customVars = ${customVarsJsArray};
+
+        const allVars = [...defaultVars, ...window.customVars];
+
+        // Popup Open/Close
+        document.getElementById('insertVarBtn').onclick = () => {
+          showVarPopup();
+        };
+        document.getElementById('varCloseBtn').onclick = closeVarPopup;
+
+        function showVarPopup() {
+          renderVarList('');
+          document.getElementById('varPopup').style.display = 'flex';
+          document.getElementById('varSearch').value = '';
+          document.getElementById('varSearch').focus();
+        }
+        function closeVarPopup() {
+          document.getElementById('varPopup').style.display = 'none';
+        }
+
+        // Render List
+        function renderVarList(filter) {
+          const list = document.getElementById('varList');
+          list.innerHTML = '';
+          allVars
+            .filter(v => v.toLowerCase().includes(filter.toLowerCase()))
+            .forEach(v => {
+              const li = document.createElement('li');
+              li.textContent = v;
+              li.style.cssText = "padding:8px 12px; cursor:pointer; border-radius:6px; font-size:16px; color:#7d38a8;";
+              li.onmouseover = () => li.style.background = "#f3eaff";
+              li.onmouseout = () => li.style.background = "";
+              li.onclick = () => insertVarToReply(v);
+              list.appendChild(li);
+            });
+        }
+        document.getElementById('varSearch').oninput = function() {
+          renderVarList(this.value);
+        }
+
+        // Insert to textarea at cursor position
+        function insertVarToReply(variable) {
+          const textarea = document.getElementById('replies');
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const value = textarea.value;
+          textarea.value = value.substring(0, start) + variable + value.substring(end);
+          textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+          textarea.focus();
+          closeVarPopup();
+        }
+
+        // ESC key closes popup
+        document.addEventListener('keydown', function(e){
+          if(document.getElementById('varPopup').style.display == 'flex' && e.key === 'Escape'){
+            closeVarPopup();
+          }
+        });
         </script>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
