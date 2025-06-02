@@ -680,50 +680,110 @@ app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
 // --- Custom Variables Management (As per your initial code - manage page, add/edit/delete routes) ---
 
 // List Custom Variables
+// List Custom Variables (with stylish box UI)
 app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
     try {
         const variables = await CustomVariable.find({});
         const listItems = variables.map(v => `
-            <li>
-                <strong>%${v.name}%</strong>: ${v.value}
-                <a href="/admin/edit-custom-variable/${v._id}">Edit</a>
-                <a href="/admin/delete-custom-variable/${v._id}" onclick="return confirm('Delete this variable?')">Delete</a>
-            </li>
+            <div class="custom-var-box">
+                <div class="var-header">
+                    <div class="var-name">%${v.name}%</div>
+                    <div class="var-actions">
+                        <a title="Edit" href="/admin/edit-custom-variable/${v._id}"><svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg></a>
+                        <a title="Delete" href="/admin/delete-custom-variable/${v._id}" onclick="return confirm('Delete this variable?')"><svg height="22" width="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg></a>
+                    </div>
+                </div>
+                <div class="var-value">${v.value.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+            </div>
         `).join('');
 
         const content = `
-            <h2>Manage Custom Variables</h2>
-            <ul class="custom-var-list">${listItems}</ul>
-            <a href="/admin/add-custom-variable">Add New Variable</a>
-            <a href="/admin/dashboard">← Back to Dashboard</a>
+            <h2 style="margin-top:0;">Manage Custom Variables</h2>
+            <div class="custom-var-list">${listItems || '<em>No variables found.</em>'}</div>
+            <a class="btn" href="/admin/add-custom-variable">➕ Add New Variable</a>
+            <a class="btn back" href="/admin/dashboard">← Back to Dashboard</a>
             <style>
                 .custom-var-list {
-                    list-style: none;
-                    padding: 0;
-                    margin: 20px 0;
-                }
-                .custom-var-list li {
-                    background: #f9f9f9;
-                    border: 1px solid #ddd;
-                    padding: 10px 15px;
-                    margin-bottom: 8px;
-                    border-radius: 5px;
                     display: flex;
+                    flex-direction: column;
+                    gap: 18px;
+                    margin: 18px 0 30px 0;
+                }
+                .custom-var-box {
+                    background: linear-gradient(95deg, #fff, #f2e6ff 60%);
+                    border: 1.5px solid #c7b0fa;
+                    border-radius: 14px;
+                    box-shadow: 0 2px 12px #b785fa22;
+                    padding: 14px 22px 10px 22px;
+                    position: relative;
+                    transition: box-shadow 0.18s;
+                    max-width: 550px;
+                    margin: auto;
+                }
+                .custom-var-box:hover {
+                    box-shadow: 0 4px 18px #bb6ffa33;
+                }
+                .var-header {
+                    display: flex;
+                    justify-content: space-between;
                     align-items: center;
-                    flex-wrap: wrap;
+                    margin-bottom: 8px;
+                    gap: 18px;
                 }
-                .custom-var-list li strong {
-                    margin-right: 10px;
-                    color: #333;
+                .var-name {
+                    font-family: 'Lexend', 'Inter', sans-serif;
+                    font-size: 18px;
+                    font-weight: 700;
+                    color: #7339b3;
+                    word-break: break-all;
                 }
-                .custom-var-list li a {
-                    margin-left: 15px;
+                .var-actions a {
+                    display: inline-flex;
+                    align-items: center;
+                    color: #656565;
+                    margin-left: 10px;
+                    opacity: 0.82;
+                    transition: color 0.18s, opacity 0.12s;
+                }
+                .var-actions a:hover {
+                    color: #9e2cff;
+                    opacity: 1;
+                }
+                .var-actions svg {
+                    vertical-align: middle;
+                    margin-bottom: 1.5px;
+                }
+                .var-value {
+                    font-family: 'Roboto Mono', monospace;
+                    font-size: 15px;
+                    color: #272b34;
+                    max-height: 52px; /* Show only 3 lines (about) */
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 3; /* Show 3 lines */
+                    -webkit-box-orient: vertical;
+                    background: #f8f6fa;
+                    border-radius: 8px;
+                    padding: 9px 14px;
+                    margin-bottom: 2px;
+                    word-break: break-all;
+                }
+                .btn {
+                    background: #8e5eff;
+                    color: #fff;
+                    padding: 10px 18px;
+                    border-radius: 6px;
                     text-decoration: none;
-                    color: #2563eb;
+                    margin-right: 8px;
+                    transition: background 0.16s;
+                    display: inline-block;
+                    font-weight: 500;
+                    font-size: 15px;
                 }
-                .custom-var-list li a:hover {
-                    text-decoration: underline;
-                }
+                .btn:hover { background: #7343c9; }
+                .btn.back { background: #e6e6e6; color: #5e5e5e; }
+                .btn.back:hover { background: #bdbdbd; color: #222; }
             </style>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Manage Custom Variables', content));
