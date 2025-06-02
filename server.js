@@ -128,26 +128,9 @@ const allVariables = [
   "%rndm_ascii_LENGTH%", "%rndm_symbol_LENGTH%", "%rndm_grawlix_LENGTH%"  
 ];  
   
-function toggleVariableList(button) {  
-  const form = button.closest('form');  
-  const list = form.querySelector('.variable-dropdown'); // Use closest dropdown  
-  const textarea = form.querySelector('textarea'); // Find the correct textarea  
-  
-  if (!list || !textarea) return;  
-  
+function toggleVariableList() {  
+  const list = document.getElementById('existingVars');  
   list.innerHTML = '';  
-  allVariables.forEach(v => {  
-    const li = document.createElement('li');  
-    li.textContent = v;  
-    li.style.cursor = 'pointer';  
-    li.onmousedown = () => {  
-      insertVariable(v, textarea, list);  
-    };  
-    list.appendChild(li);  
-  });  
-  
-  list.style.display = list.style.display === 'block' ? 'none' : 'block';  
-}  
   
   allVariables.forEach(v => {  
     const li = document.createElement('li');  
@@ -163,14 +146,15 @@ function toggleVariableList(button) {
   list.style.display = 'none';  
 });  
   
-function insertVariable(v, textarea, list) {  
+function insertVariable(variable) {  
+  const textarea = document.getElementById('replies');  
   const start = textarea.selectionStart;  
   const end = textarea.selectionEnd;  
   const text = textarea.value;  
-  textarea.value = text.slice(0, start) + v + text.slice(end);  
+  textarea.value = text.substring(0, start) + variable + text.substring(end);  
   textarea.focus();  
-  textarea.selectionEnd = start + v.length;  
-  list.style.display = 'none';  
+  textarea.selectionEnd = start + variable.length;  
+  document.getElementById('existingVars').style.display = 'none';  
 }  
   
 // Auto-suggestion on % typing  
@@ -500,44 +484,28 @@ const addReplyForm = `
 
 <ul id="existingVars" class="variable-dropdown"></ul>  
 <script>  
-function toggleVariableList(button) {  
-  const form = button.closest('form');  
-  const list = form.querySelector('.variable-dropdown'); // Use closest dropdown  
-  const textarea = form.querySelector('textarea'); // Find the correct textarea  if (!list || !textarea) return;
-
-list.innerHTML = '';
-allVariables.forEach(v => {
-const li = document.createElement('li');
-li.textContent = v;
-li.style.cursor = 'pointer';
-li.onmousedown = () => {
-insertVariable(v, textarea, list);
-};
-list.appendChild(li);
-});
-
-list.style.display = list.style.display === 'block' ? 'none' : 'block';
-}
-function insertVariable(v, textarea, list) {
-const start = textarea.selectionStart;
-const end = textarea.selectionEnd;
-const text = textarea.value;
-textarea.value = text.slice(0, start) + v + text.slice(end);
-textarea.focus();
-textarea.selectionEnd = start + v.length;
-list.style.display = 'none';
-}
-</script>
-Available replacements:<br>
-Message: %message%, %message_LENGTH%, %capturing_group_ID%<br>
-Name: %name%, %first_name%, %last_name%, %chat_name%<br>
-Date & Time: %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
-AutoResponder: %rule_id%<br>
-Random: %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
-${customVarList}
-</small>
-
-<label for="priority">Priority:</label>  
+function toggleVariableList() {  
+    const list = document.getElementById('existingVars');  
+    list.style.display = list.style.display === 'none' ? 'block' : 'none';  
+}  
+function insertVariable(variable) {  
+    const textarea = document.getElementById('replies');  
+    const start = textarea.selectionStart;  
+    const end = textarea.selectionEnd;  
+    const text = textarea.value;  
+    textarea.value = text.substring(0, start) + variable + text.substring(end);  
+    textarea.focus();  
+    textarea.selectionEnd = start + variable.length;  
+}  
+</script>  
+            **Available replacements:**<br>  
+            **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>  
+            **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>  
+            **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>  
+            **AutoResponder:** %rule_id%<br>  
+            **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%  
+            ${customVarList}  
+        </small>  <label for="priority">Priority:</label>  
     <input type="number" name="priority" id="priority" value="0" />  
 
     <div id="isDefaultField" style="display:none;">  
@@ -832,39 +800,23 @@ const editReplyForm = `
 
    <label for="replies">Replies (use &lt;#&gt; between lines):</label>
 
-<textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>  <button type="button" onclick="toggleVariableList(this)">🧠 Insert Variable</button>
+<textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>  <button type="button" onclick="toggleVariableList()">🧠 Insert Variable</button>
 
 <ul id="existingVars" style="display:none; padding:10px; margin-top:10px; border:1px solid #ccc; background:#f9f9f9;">  
     ${customVariables.map(v => `<li style="cursor:pointer;" onclick="insertVariable('%${v.name}%')"><code>%${v.name}%</code></li>`).join('')}  
 </ul>  <script>  
-function toggleVariableList(button) {  
-  const form = button.closest('form');  
-  const list = form.querySelector('.variable-dropdown'); // Use closest dropdown  
-  const textarea = form.querySelector('textarea'); // Find the correct textarea  
-  
-  if (!list || !textarea) return;  
-  
-  list.innerHTML = '';  
-  allVariables.forEach(v => {  
-    const li = document.createElement('li');  
-    li.textContent = v;  
-    li.style.cursor = 'pointer';  
-    li.onmousedown = () => {  
-      insertVariable(v, textarea, list);  
-    };  
-    list.appendChild(li);  
-  });  
-  
-  list.style.display = list.style.display === 'block' ? 'none' : 'block';  
+function toggleVariableList() {  
+    const list = document.getElementById('existingVars');  
+    list.style.display = list.style.display === 'none' ? 'block' : 'none';  
 }  
-function insertVariable(v, textarea, list) {  
-  const start = textarea.selectionStart;  
-  const end = textarea.selectionEnd;  
-  const text = textarea.value;  
-  textarea.value = text.slice(0, start) + v + text.slice(end);  
-  textarea.focus();  
-  textarea.selectionEnd = start + v.length;  
-  list.style.display = 'none';  
+function insertVariable(variable) {  
+    const textarea = document.getElementById('replies');  
+    const start = textarea.selectionStart;  
+    const end = textarea.selectionEnd;  
+    const text = textarea.value;  
+    textarea.value = text.substring(0, start) + variable + text.substring(end);  
+    textarea.focus();  
+    textarea.selectionEnd = start + variable.length;  
 }  
 </script>  <small>  
         **Available replacements:**<br>  
@@ -1058,30 +1010,13 @@ const addVariableForm = `
         <br><br><button type="submit">Add Variable</button>  
     </form>  
 
-    <script>
+    <script>  
+    function toggleVariableList() {  
+        const list = document.getElementById('existingVars');  
+        list.style.display = list.style.display === 'none' ? 'block' : 'none';  
+    }  
 
-function toggleVariableList(button) {
-const form = button.closest('form');
-const list = form.querySelector('.variable-dropdown'); // Use closest dropdown
-const textarea = form.querySelector('textarea'); // Find the correct textarea
-
-if (!list || !textarea) return;
-
-list.innerHTML = '';
-allVariables.forEach(v => {
-const li = document.createElement('li');
-li.textContent = v;
-li.style.cursor = 'pointer';
-li.onmousedown = () => {
-insertVariable(v, textarea, list);
-};
-list.appendChild(li);
-});
-
-list.style.display = list.style.display === 'block' ? 'none' : 'block';
-}
-
-function fillVariable(val) {  
+    function fillVariable(val) {  
         document.getElementById('value').value = val;  
     }  
     </script>  
