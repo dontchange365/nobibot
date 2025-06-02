@@ -68,15 +68,15 @@ app.use(session({
 }));
 app.use(express.static(path.join(__dirname, 'public'))); // Serve static files from 'public' directory
 
-// --- Helper Functions ---
+// ==== HELPER FUNCTIONS ====
 
-// Middleware to check if user is authenticated (admin)
+// Auth checker
 function isAuthenticated(req, res, next) {
     if (req.session.loggedIn) return next();
     return res.redirect('/admin/login');
 }
 
-// Helper to create a consistent HTML structure with linked CSS
+// HTML template
 function getHtmlTemplate(title, bodyContent) {
     return `
     <!DOCTYPE html>
@@ -94,8 +94,24 @@ function getHtmlTemplate(title, bodyContent) {
     `;
 }
 
-// Function to get a random reply from an array
-const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
+// ==== REPLY LIST HELPERS ==== (yeh functions sirf ek jagah hona chahiye)
+function getReplyIcon(r) {
+    if (r.type && r.type.includes('react')) return "😂";
+    if (r.type === 'exact_match') return "🎯";
+    if (r.type === 'pattern_matching') return "🧩";
+    if (r.type === 'expert_pattern_matching') return "🧠";
+    if (r.type === 'welcome_message') return "👋";
+    if (r.type === 'default_message') return "💬";
+    return "";
+}
+function formatReceive(r) {
+    if (r.type === 'exact_match' || r.type === 'pattern_matching') return r.keyword || '-';
+    if (r.type === 'expert_pattern_matching') return r.pattern || '-';
+    return (r.keyword || r.pattern || '-');
+}
+function formatSend(r) {
+    return (r.replies || []).join('<#>').slice(0, 600) + ((r.replies.join('<#>').length > 600) ? ' ...' : '');
+}
 
 // --- Original handleReplySend Logic (Before Nested Variables) ---
 async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null, reqSession = {}) {
@@ -494,36 +510,9 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     res.redirect('/admin/reply-list');
 });
 
-// REPLY LIST
-   // ======= Helper Functions (file ke upar ya neeche paste kar) =======
-
-function getReplyIcon(r) {
-    if (r.type && r.type.includes('react')) return "😂";
-    if (r.type === 'exact_match') return "🎯";
-    if (r.type === 'pattern_matching') return "🧩";
-    if (r.type === 'expert_pattern_matching') return "🧠";
-    if (r.type === 'welcome_message') return "👋";
-    if (r.type === 'default_message') return "💬";
-    return "";
-}
-function formatReceive(r) {
-    if (r.type === 'exact_match' || r.type === 'pattern_matching') {
-        return r.keyword || '-';
-    }
-    if (r.type === 'expert_pattern_matching') {
-        return r.pattern || '-';
-    }
-    return (r.keyword || r.pattern || '-');
-}
-function formatSend(r) {
-    return (r.replies || []).join('<#>').slice(0, 600) + ((r.replies.join('<#>').length > 600) ? ' ...' : '');
-}
-
-// ========== Stylish /admin/reply-list Route ==========
-
+// 5. REPLY LIST (STYLISH)
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const replies = await ChatReply.find().sort({ priority: -1 });
-
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
@@ -550,7 +539,6 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
             </div>
         </div>
     `).join('');
-
     const content = `
         <div class="nobita-reply-panel">
             <h2 class="nobita-title">REPLY LIST</h2>
@@ -559,65 +547,14 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
         </div>
         <style>
             body { background: #1a1a1a; }
-            .nobita-title {
-                color: #fff;
-                font-family: 'Lexend', 'Inter', sans-serif;
-                letter-spacing: 1px;
-                margin-bottom: 24px;
-                text-align: center;
-                font-weight: 700;
-                font-size: 28px;
-            }
-            .nobita-reply-panel {
-                max-width: 600px;
-                margin: 32px auto 60px auto;
-                padding: 0 6px;
-            }
-            .reply-card {
-                background: linear-gradient(98deg, #272733 80%, #3d1153 100%);
-                border: 1.5px solid #d074f9cc;
-                border-radius: 16px;
-                box-shadow: 0 3px 18px #0006;
-                padding: 16px 16px 12px 16px;
-                margin-bottom: 30px;
-                position: relative;
-            }
-            .reply-header {
-                font-size: 19px;
-                font-weight: 700;
-                color: #fff;
-                letter-spacing: 1px;
-                margin-bottom: 12px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            .reply-title {
-                text-transform: uppercase;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-            .reply-inner {
-                background: rgba(34,34,40,0.75);
-                border-radius: 10px;
-                padding: 12px 14px 8px 14px;
-            }
-            .reply-row {
-                display: flex;
-                gap: 8px;
-                align-items: flex-start;
-                margin-bottom: 7px;
-                flex-wrap: wrap;
-            }
-            .reply-label {
-                min-width: 70px;
-                color: #ffc952;
-                font-family: 'Lexend', 'Inter', sans-serif;
-                font-weight: 600;
-                font-size: 15px;
-                letter-spacing: 0.3px;
-            }
+            .nobita-title { color: #fff; font-family: 'Lexend', 'Inter', sans-serif; letter-spacing: 1px; margin-bottom: 24px; text-align: center; font-weight: 700; font-size: 28px; }
+            .nobita-reply-panel { max-width: 600px; margin: 32px auto 60px auto; padding: 0 6px; }
+            .reply-card { background: linear-gradient(98deg, #272733 80%, #3d1153 100%); border: 1.5px solid #d074f9cc; border-radius: 16px; box-shadow: 0 3px 18px #0006; padding: 16px 16px 12px 16px; margin-bottom: 30px; position: relative; }
+            .reply-header { font-size: 19px; font-weight: 700; color: #fff; letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+            .reply-title { text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+            .reply-inner { background: rgba(34,34,40,0.75); border-radius: 10px; padding: 12px 14px 8px 14px; }
+            .reply-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 7px; flex-wrap: wrap; }
+            .reply-label { min-width: 70px; color: #ffc952; font-family: 'Lexend', 'Inter', sans-serif; font-weight: 600; font-size: 15px; letter-spacing: 0.3px; }
             .reply-label.send { color: #ff6f61; }
             .reply-label.receive { color: #46e579; }
             .reply-receive, .reply-send {
@@ -667,6 +604,8 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content));
 });
+
+
 // EDIT REPLY
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     try {
