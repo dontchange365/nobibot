@@ -127,6 +127,23 @@ const allVariables = [
   "%rndm_ascii_LENGTH%", "%rndm_symbol_LENGTH%", "%rndm_grawlix_LENGTH%"
 ];
 
+// Re-fetch custom variables for the client-side JavaScript, as they are dynamic
+async function fetchAndPopulateCustomVariables() {
+    try {
+        const response = await fetch('/api/custom-variables'); // You'll need to add this API endpoint
+        const customVars = await response.json();
+        customVars.forEach(v => {
+            allVariables.push(\`%\${v.name}%\`);
+        });
+        // You might want to re-render dropdowns or ensure they fetch fresh data
+        // after these are loaded. For now, assume they are loaded before any interaction.
+    } catch (error) {
+        console.error('Error fetching custom variables:', error);
+    }
+}
+// Call this on page load if you want custom variables in the client-side list
+// fetchAndPopulateCustomVariables(); // Uncomment if you add the API endpoint
+
 function toggleVariableList(button) {
   const form = button.closest('form');
   const list = form.querySelector('.variable-dropdown'); // Use closest dropdown
@@ -135,32 +152,37 @@ function toggleVariableList(button) {
   if (!list || !textarea) return;
 
   list.innerHTML = '';
+  // Ensure allVariables includes dynamically loaded ones if you enabled fetchAndPopulateCustomVariables
   allVariables.forEach(v => {
     const li = document.createElement('li');
     li.textContent = v;
     li.style.cursor = 'pointer';
-    li.onmousedown = () => {
+    li.onmousedown = (event) => { // Use mousedown to prevent blur from hiding dropdown
+      event.preventDefault(); // Prevent textarea from losing focus immediately
       insertVariable(v, textarea, list);
     };
     list.appendChild(li);
   });
 
   list.style.display = list.style.display === 'block' ? 'none' : 'block';
+  // Position dropdown relative to textarea if needed
+  const textareaRect = textarea.getBoundingClientRect();
+  list.style.top = \`${textareaRect.bottom + window.scrollY}px\`;
+  list.style.left = \`${textareaRect.left + window.scrollX}px\`;
+  list.style.width = \`${textareaRect.width}px\`;
 }
 
-  allVariables.forEach(v => {
-    const li = document.createElement('li');
-    li.textContent = v;
-    li.style.cursor = 'pointer';
-    li.onmousedown = () => insertVariable(v);
-    list.appendChild(li);
+document.addEventListener('click', function(e) {
+  // Hide all variable dropdowns if click is outside any dropdown or its toggle button
+  document.querySelectorAll('.variable-dropdown').forEach(list => {
+    const toggleButton = list.previousElementSibling; // Assuming button is right before list
+    if (e.target.closest('.variable-dropdown') || (toggleButton && e.target === toggleButton)) {
+      return; // Do nothing if clicked inside dropdown or on its toggle button
+    }
+    list.style.display = 'none';
   });
-
-  document.addEventListener('click', function(e) {
-  const list = document.getElementById('existingVars');
-  if (e.target.closest('#existingVars') || e.target.closest('button[onclick="toggleVariableList()"]')) return;
-  list.style.display = 'none';
 });
+
 
 function insertVariable(v, textarea, list) {
   const start = textarea.selectionStart;
@@ -169,38 +191,56 @@ function insertVariable(v, textarea, list) {
   textarea.value = text.slice(0, start) + v + text.slice(end);
   textarea.focus();
   textarea.selectionEnd = start + v.length;
-  list.style.display = 'none';
+  if (list) list.style.display = 'none'; // Hide dropdown after insertion
 }
 
 // Auto-suggestion on % typing
 document.addEventListener('DOMContentLoaded', () => {
-  const textarea = document.getElementById('replies');
-  const dropdown = document.getElementById('existingVars');
+  // This logic needs to be applied to all textareas that might use variables
+  // For simplicity, let's target any textarea with a specific class or ID,
+  // or iterate through all of them.
+  // For the 'replies' textarea in add/edit forms:
+  const repliesTextarea = document.getElementById('replies');
+  if (repliesTextarea) {
+      const dropdownForReplies = document.getElementById('existingVars');
 
-  textarea.addEventListener('input', () => {
-    const cursorPos = textarea.selectionStart;
-    const textBefore = textarea.value.slice(0, cursorPos);
-    const match = textBefore.match(/%[a-zA-Z0-9_]*$/);
-    if (match) {
-      const query = match[0];
-      const filtered = allVariables.filter(v => v.startsWith(query));
-      dropdown.innerHTML = '';
-      filtered.forEach(v => {
-        const li = document.createElement('li');
-        li.textContent = v;
-        li.style.cursor = 'pointer';
-        li.onmousedown = () => insertVariable(v);
-        dropdown.appendChild(li);
+      repliesTextarea.addEventListener('input', () => {
+        const cursorPos = repliesTextarea.selectionStart;
+        const textBefore = repliesTextarea.value.slice(0, cursorPos);
+        const match = textBefore.match(/%[a-zA-Z0-9_]*$/); // Match partial variable name
+        if (match && dropdownForReplies) {
+          const query = match[0];
+          const filtered = allVariables.filter(v => v.startsWith(query));
+          dropdownForReplies.innerHTML = '';
+          filtered.forEach(v => {
+            const li = document.createElement('li');
+            li.textContent = v;
+            li.style.cursor = 'pointer';
+            li.onmousedown = (event) => { // Use mousedown for auto-suggestion as well
+              event.preventDefault();
+              insertVariable(v, repliesTextarea, dropdownForReplies);
+            };
+            dropdownForReplies.appendChild(li);
+          });
+          dropdownForReplies.style.display = filtered.length ? 'block' : 'none';
+
+          // Position dropdown
+          const textareaRect = repliesTextarea.getBoundingClientRect();
+          dropdownForReplies.style.top = \`${textareaRect.bottom + window.scrollY}px\`;
+          dropdownForReplies.style.left = \`${textareaRect.left + window.scrollX}px\`;
+          dropdownForReplies.style.width = \`${textareaRect.width}px\`;
+        } else if (dropdownForReplies) {
+          dropdownForReplies.style.display = 'none';
+        }
       });
-      dropdown.style.display = filtered.length ? 'block' : 'none';
-    } else {
-      dropdown.style.display = 'none';
-    }
-  });
 
-  textarea.addEventListener('blur', () => {
-    setTimeout(() => dropdown.style.display = 'none', 200);
-  });
+      repliesTextarea.addEventListener('blur', () => {
+        // Delay hiding to allow mousedown on dropdown items to register
+        setTimeout(() => {
+          if (dropdownForReplies) dropdownForReplies.style.display = 'none';
+        }, 200);
+      });
+  }
 });
 </script>
     </body>
@@ -230,8 +270,43 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
             break;
     }
 
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    // --- Custom Variable Replacements (First Pass - Iterative for nesting) ---
+    let changed = true;
+    let iterationCount = 0;
+    const MAX_ITERATIONS = 5; // Prevent infinite loops for circular dependencies or complex nesting
+
+    while (changed && iterationCount < MAX_ITERATIONS) {
+        changed = false;
+        iterationCount++;
+        try {
+            const customVariables = await CustomVariable.find({});
+            for (const variable of customVariables) {
+                const sanitizedName = variable.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`%${sanitizedName}%`, 'g');
+                const originalReplyText = replyText;
+                replyText = replyText.replace(regex, variable.value);
+                if (replyText !== originalReplyText) {
+                    changed = true; // Something was replaced, so we might need another pass
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching custom variables for replacement:", error);
+            break; // Exit loop on error
+        }
+    }
+    if (iterationCount >= MAX_ITERATIONS) {
+        console.warn("Max iterations reached for custom variable replacement. Possible circular dependency or deep nesting.");
+    }
+    // --- End Custom Variable Replacements ---
+
+    // Now, after custom variables have potentially introduced new dynamic variables,
+    // process all the built-in variables. This part remains largely the same,
+    // but its execution order is crucial for nested variable resolution.
+
     // Using 'en-IN' locale for date and time formatting relevant to India (Patna, Bihar)
+    const now = new Date(); // Use current server time first
+    const kolkataTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+
     const optionsDate = { year: 'numeric', month: 'long', day: 'numeric' };
     const optionsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
     const optionsHourShort = { hour: 'numeric', hour12: true };
@@ -242,24 +317,9 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
     const optionsDayOfWeek = { weekday: 'long' };
     const optionsDayOfWeekShort = { weekday: 'short' };
 
-    // --- Custom Variable Replacements (PRIORITY: BEFORE other replacements) ---
-    try {
-        const customVariables = await CustomVariable.find({});
-        customVariables.forEach(variable => {
-            // Use a regex to replace all occurrences of %variable_name%
-            // Ensure variable name is valid for regex (no special chars)
-            const sanitizedName = variable.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(`%${sanitizedName}%`, 'g');
-            replyText = replyText.replace(regex, variable.value);
-        });
-    } catch (error) {
-        console.error("Error fetching custom variables for replacement:", error);
-        // Continue with other replacements even if custom variables fail
-    }
-    // --- End Custom Variable Replacements ---
-
     // 1. Message variables
     replyText = replyText.replace(/%message%/g, userMessage || '');
+    replyText = replyText.replace(/%message_LENGTH%/g, (userMessage || '').length.toString()); // Added %message_LENGTH%
     replyText = replyText.replace(/%message_(\d+)%/g, (match, len) => (userMessage || '').substring(0, parseInt(len)));
 
     // Capturing groups (only applicable if used with Expert Pattern Matching and regex matched)
@@ -276,31 +336,32 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
     replyText = replyText.replace(/%last_name%/g, userName.split(' ').slice(1).join(' ') || '');
     replyText = replyText.replace(/%chat_name%/g, userName);
 
-    // 3. Date & Time variables
-    replyText = replyText.replace(/%date%/g, now.toLocaleDateString('en-IN', optionsDate));
-    replyText = replyText.replace(/%time%/g, now.toLocaleTimeString('en-IN', optionsTime));
+    // 3. Date & Time variables (using kolkataTime)
+    replyText = replyText.replace(/%date%/g, kolkataTime.toLocaleDateString('en-IN', optionsDate));
+    replyText = replyText.replace(/%time%/g, kolkataTime.toLocaleTimeString('en-IN', optionsTime));
 
-    replyText = replyText.replace(/%hour%/g, now.toLocaleTimeString('en-IN', optionsHourShort).split(' ')[0]);
-    replyText = replyText.replace(/%hour_short%/g, now.toLocaleTimeString('en-IN', { hour: 'numeric', hour12: true }).split(' ')[0]);
-    replyText = replyText.replace(/%hour_of_day%/g, now.toLocaleTimeString('en-IN', optionsHour24).split(' ')[0]);
-    replyText = replyText.replace(/%hour_of_day_short%/g, now.toLocaleTimeString('en-IN', optionsHour24Short).split(' ')[0]);
-    replyText = replyText.replace(/%minute%/g, String(now.getMinutes()).padStart(2, '0'));
-    replyText = replyText.replace(/%second%/g, String(now.getSeconds()).padStart(2, '0'));
-    replyText = replyText.replace(/%millisecond%/g, String(now.getMilliseconds()).padStart(3, '0'));
-    replyText = replyText.replace(/%am\/pm%/g, now.getHours() >= 12 ? 'pm' : 'am');
+    replyText = replyText.replace(/%hour%/g, kolkataTime.toLocaleTimeString('en-IN', optionsHourShort).split(' ')[0]);
+    replyText = replyText.replace(/%hour_short%/g, kolkataTime.toLocaleTimeString('en-IN', { hour: 'numeric', hour12: true }).split(' ')[0]);
+    replyText = replyText.replace(/%hour_of_day%/g, kolkataTime.toLocaleTimeString('en-IN', optionsHour24).split(' ')[0]);
+    replyText = replyText.replace(/%hour_of_day_short%/g, kolkataTime.toLocaleTimeString('en-IN', optionsHour24Short).split(' ')[0]);
+    replyText = replyText.replace(/%minute%/g, String(kolkataTime.getMinutes()).padStart(2, '0'));
+    replyText = replyText.replace(/%second%/g, String(kolkataTime.getSeconds()).padStart(2, '0'));
+    replyText = replyText.replace(/%millisecond%/g, String(kolkataTime.getMilliseconds()).padStart(3, '0'));
+    replyText = replyText.replace(/%am\/pm%/g, kolkataTime.getHours() >= 12 ? 'pm' : 'am');
 
-    replyText = replyText.replace(/%day_of_month%/g, String(now.getDate()).padStart(2, '0'));
-    replyText = replyText.replace(/%day_of_month_short%/g, String(now.getDate()));
-    replyText = replyText.replace(/%month%/g, String(now.getMonth() + 1).padStart(2, '0'));
-    replyText = replyText.replace(/%month_short%/g, String(now.getMonth() + 1));
-    replyText = replyText.replace(/%month_name%/g, now.toLocaleDateString('en-IN', optionsMonthName));
-    replyText = replyText.replace(/%month_name_short%/g, now.toLocaleDateString('en-IN', optionsMonthNameShort));
-    replyText = replyText.replace(/%year%/g, String(now.getFullYear()));
-    replyText = replyText.replace(/%year_short%/g, String(now.getFullYear()).slice(-2));
-    replyText = replyText.replace(/%day_of_week%/g, now.toLocaleDateString('en-IN', optionsDayOfWeek));
-    replyText = replyText.replace(/%day_of_week_short%/g, now.toLocaleDateString('en-IN', optionsDayOfWeekShort));
+    replyText = replyText.replace(/%day_of_month%/g, String(kolkataTime.getDate()).padStart(2, '0'));
+    replyText = replyText.replace(/%day_of_month_short%/g, String(kolkataTime.getDate()));
+    replyText = replyText.replace(/%month%/g, String(kolkataTime.getMonth() + 1).padStart(2, '0'));
+    replyText = replyText.replace(/%month_short%/g, String(kolkataTime.getMonth() + 1));
+    replyText = replyText.replace(/%month_name%/g, kolkataTime.toLocaleDateString('en-IN', optionsMonthName));
+    replyText = replyText.replace(/%month_name_short%/g, kolkataTime.toLocaleDateString('en-IN', optionsMonthNameShort));
+    replyText = replyText.replace(/%year%/g, String(kolkataTime.getFullYear()));
+    replyText = replyText.replace(/%year_short%/g, String(kolkataTime.getFullYear()).slice(-2));
+    replyText = replyText.replace(/%day_of_week%/g, kolkataTime.toLocaleDateString('en-IN', optionsDayOfWeek));
+    replyText = replyText.replace(/%day_of_week_short%/g, kolkataTime.toLocaleDateString('en-IN', optionsDayOfWeekShort));
 
-    // Day of year and Week of year (placeholders for now)
+    // Day of year and Week of year (placeholders for now, actual calculation needed if desired)
+    // You'd need a library like 'date-fns' or a custom function to calculate these accurately.
     replyText = replyText.replace(/%day_of_year%/g, 'N/A_DayOfYear');
     replyText = replyText.replace(/%week_of_year%/g, 'N/A_WeekOfYear');
 
@@ -312,9 +373,12 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
         return String(Math.floor(Math.random() * (parseInt(max) - parseInt(min) + 1)) + parseInt(min));
     });
 
+    // Improved regex for rndm_custom to allow commas inside characters if escaped or in brackets
+    // This allows for things like: %rndm_custom_1_[item1, item2]% to pick "item1, item2" as one item
     replyText = replyText.replace(/%rndm_custom_(\d+)_(.*?)%/g, (match, len, charSet) => {
         len = parseInt(len);
-        const chars = charSet.split(/,(?![^[]*\])/).map(s => s.trim());
+        // Split by comma that is NOT inside square brackets or parentheses
+        const chars = charSet.split(/,(?![^\[]*\])(?![^(]*\))/).map(s => s.trim());
         let result = '';
         for (let i = 0; i < len; i++) {
             result += chars[Math.floor(Math.random() * chars.length)];
@@ -537,39 +601,9 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 
         <label for="replies">Replies (use &lt;#&gt; between lines):</label>
 <textarea name="replies" id="replies" required></textarea>
-<button type="button" onclick="toggleVariableList()">🧠 Insert Variable</button>
+<button type="button" onclick="toggleVariableList(this)">🧠 Insert Variable</button>
 <ul id="existingVars" class="variable-dropdown"></ul>
-<script>
-function toggleVariableList(button) {
-  const form = button.closest('form');
-  const list = form.querySelector('.variable-dropdown'); // Use closest dropdown
-  const textarea = form.querySelector('textarea'); // Find the correct textarea
 
-  if (!list || !textarea) return;
-
-  list.innerHTML = '';
-  allVariables.forEach(v => {
-    const li = document.createElement('li');
-    li.textContent = v;
-    li.style.cursor = 'pointer';
-    li.onmousedown = () => {
-      insertVariable(v, textarea, list);
-    };
-    list.appendChild(li);
-  });
-
-  list.style.display = list.style.display === 'block' ? 'none' : 'block';
-}
-function insertVariable(v, textarea, list) {
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const text = textarea.value;
-  textarea.value = text.slice(0, start) + v + text.slice(end);
-  textarea.focus();
-  textarea.selectionEnd = start + v.length;
-  list.style.display = 'none';
-}
-</script>
             **Available replacements:**<br>
             **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
             **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
@@ -658,7 +692,11 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
             <strong>${r.ruleName}</strong>
             <span class="type">(${r.type})</span>
         </div>
-        ${r.keyword ? `<div class="keywords">${r.keyword.slice(0, 60)}${r.keyword.length > 60 ? '...' : ''}</div>` : ''}
+        ${r.keyword ? `<div class="keywords">Keywords: ${r.keyword.slice(0, 60)}${r.keyword.length > 60 ? '...' : ''}</div>` : ''}
+        ${r.pattern ? `<div class="pattern">Pattern: <code>${r.pattern.slice(0, 60)}${r.pattern.length > 60 ? '...' : ''}</code></div>` : ''}
+        <div class="replies-preview">Replies: ${r.replies.length} message(s)</div>
+        <div class="send-method">Send Method: ${r.sendMethod}</div>
+        <div class="priority-display">Priority: ${r.priority}</div>
         <div class="actions">
             <a href="/admin/edit-reply/${r._id}" class="edit-btn">✏️</a>
             <a href="/admin/delete-reply/${r._id}" class="delete-btn" onclick="return confirm('Delete this rule?')">🗑️</a>
@@ -708,6 +746,7 @@ textarea {
         }
         .reply-item {
     display: flex;
+    flex-wrap: wrap; /* Allow items to wrap on smaller screens */
     align-items: center;
     gap: 15px;
     user-select: none;
@@ -717,7 +756,33 @@ textarea {
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     transition: transform 0.2s;
+    position: relative; /* For better internal layout control */
 }
+
+.reply-item > div {
+    flex-shrink: 0; /* Prevent individual divs from shrinking too much */
+}
+
+.reply-item .title {
+    flex-basis: 100%; /* Take full width */
+    margin-bottom: 5px;
+}
+.reply-item .keywords,
+.reply-item .pattern,
+.reply-item .replies-preview,
+.reply-item .send-method,
+.reply-item .priority-display {
+    font-size: 14px;
+    color: #666;
+    margin-right: 15px; /* Spacing between info fields */
+}
+
+.reply-item .actions {
+    margin-left: auto; /* Push actions to the right */
+    display: flex;
+    gap: 8px;
+}
+
 
 .reply-item:active {
     cursor: grabbing;
@@ -767,460 +832,446 @@ textarea {
 
     <script>
         const list = document.getElementById('replyList');
-        let dragged;
+        let draggedItem = null; // Renamed to avoid confusion with the 'dragged' variable in toggleVariableList
 
         // Drag start
         list.addEventListener('dragstart', (e) => {
-    if (!e.target.classList.contains('drag-handle')) {
-        e.preventDefault(); // prevent drag unless it's on icon
-        return;
-    }
-    dragged = e.target.closest('li.reply-item');
-    dragged.style.opacity = 0.5;
-});
+            // Ensure we are dragging the 'li' item, not just any child
+            draggedItem = e.target.closest('li.reply-item');
+            if (!draggedItem) return;
+
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', draggedItem.innerHTML); // Required for Firefox
+            draggedItem.style.opacity = 0.5;
+        });
+
         // Drag over
         list.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const after = [...list.children].find(el => e.clientY < el.getBoundingClientRect().top + el.offsetHeight / 2);
-            if (after == null) {
-                list.appendChild(dragged);
-            } else {
-                list.insertBefore(dragged, after);
+            e.preventDefault(); // Necessary to allow dropping
+            const target = e.target.closest('li.reply-item');
+
+            if (target && target !== draggedItem) {
+                const rect = target.getBoundingClientRect();
+                const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                list.insertBefore(draggedItem, next && target.nextSibling || target);
             }
         });
 
+        // Drag end
         list.addEventListener('dragend', () => {
-            dragged.style.opacity = 1;
-            const ids = [...list.children].map((el, i) => ({ id: el.dataset.id, priority: list.children.length - i }));
-            fetch('/api/update-priorities', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ updates: ids })
-            });
+            if (draggedItem) {
+                draggedItem.style.opacity = 1;
+            }
+            draggedItem = null; // Clear dragged item
+            updatePriorities();
         });
 
-        // Click to set priority manually
+        // Click to set priority manually (tap to set)
         list.addEventListener('click', (e) => {
             const item = e.target.closest('li.reply-item');
-            if (!item) return;
-            const input = prompt('Enter new priority number (1 = top)');
-            if (!input || isNaN(input)) return;
+            // If the click is on an action button, don't trigger priority change
+            if (!item || e.target.closest('.actions')) return;
+
+            const input = prompt('Enter new priority number (1 = top, ' + list.children.length + ' = bottom)');
+            if (input === null || isNaN(input)) return;
 
             const newPos = parseInt(input);
             const total = list.children.length;
-            if (newPos < 1 || newPos > total) return alert('Invalid position');
+            if (newPos < 1 || newPos > total) {
+                return alert('Invalid position. Please enter a number between 1 and ' + total + '.');
+            }
 
-            list.insertBefore(item, list.children[total - newPos]);
-            const ids = [...list.children].map((el, i) => ({ id: el.dataset.id, priority: list.children.length - i }));
+            // Calculate the actual index for insertion
+            const targetIndex = total - newPos; // Because priority 1 is highest (lowest index)
+            if (targetIndex >= 0 && targetIndex < total) {
+                list.insertBefore(item, list.children[targetIndex]);
+            } else {
+                // Should not happen with valid input range, but as a fallback
+                list.appendChild(item); // Move to end if somehow out of bounds
+            }
+            updatePriorities();
+        });
+
+        // Function to send updated priorities to the server
+        function updatePriorities() {
+            const ids = [...list.children].map((el, i) => ({
+                id: el.dataset.id,
+                priority: list.children.length - i // Highest priority for the top item
+            }));
+
             fetch('/api/update-priorities', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ updates: ids })
-            });
-        });
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success) {
+                      console.log('Priorities updated successfully!');
+                      // Optionally, visually update priority numbers if displayed
+                      // For simplicity, we just log and don't re-render entire list.
+                  } else {
+                      console.error('Failed to update priorities:', data.message);
+                  }
+              })
+              .catch(error => console.error('Error updating priorities:', error));
+        }
     </script>
     `;
 
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Chat Reply List', content));
 });
 
+// API endpoint to update priorities (for drag-and-drop / manual reordering)
+app.post('/api/update-priorities', isAuthenticated, async (req, res) => {
+    try {
+        const { updates } = req.body; // updates is an array of { id, priority }
+
+        if (!Array.isArray(updates) || updates.length === 0) {
+            return res.status(400).json({ success: false, message: 'Invalid update data.' });
+        }
+
+        const bulkOperations = updates.map(item => ({
+            updateOne: {
+                filter: { _id: item.id },
+                update: { $set: { priority: item.priority } }
+            }
+        }));
+
+        await ChatReply.bulkWrite(bulkOperations);
+        res.json({ success: true, message: 'Priorities updated.' });
+    } catch (error) {
+        console.error('Error in /api/update-priorities:', error);
+        res.status(500).json({ success: false, message: 'Server error updating priorities.' });
+    }
+});
+
+
 // EDIT REPLY
 app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
-    const r = await ChatReply.findById(req.params.id);
-    if (!r) {
-        return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Reply not found.</p><br><a href="/admin/reply-list">Back to Reply List</a>'));
-    }
-
-    let customVarList = '';
     try {
-        const customVariables = await CustomVariable.find({});
-        customVarList = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
-        if (customVarList) {
-            customVarList = `<br>**Custom Variables:** ${customVarList}`;
+        const reply = await ChatReply.findById(req.params.id);
+        if (!reply) {
+            return res.status(404).set('Content-Type', 'text/html').send(getHtmlTemplate('Not Found', '<p>Reply not found.</p><br><a href="/admin/reply-list">Back to List</a>'));
         }
-    } catch (e) {
-        console.error("Error fetching custom variables for form:", e);
-    }
 
-    const editReplyForm = `
-    <form method="POST" action="/admin/edit-reply/${r._id}">
-        <label for="ruleName">Rule Name:</label>
-        <input name="ruleName" id="ruleName" value="${r.ruleName}" required />
-        <label for="sendMethod">Send Method:</label>
-<select name="sendMethod" id="sendMethod">
-    <option value="random" ${r.sendMethod === 'random' ? 'selected' : ''}>Random</option>
-    <option value="all" ${r.sendMethod === 'all' ? 'selected' : ''}>All</option>
-    <option value="once" ${r.sendMethod === 'once' ? 'selected' : ''}>Once</option>
-</select>
-        <h2>Edit Reply</h2>
-        <label for="type">Type:</label>
-        <input name="type" id="type" value="${r.type}" readonly />
+        let customVarList = '';
+        try {
+            const customVariables = await CustomVariable.find({});
+            customVarList = customVariables.map(v => `<code>%${v.name}%</code>`).join(', ');
+            if (customVarList) {
+                customVarList = `<br>**Custom Variables:** ${customVarList}`;
+            }
+        } catch (e) {
+            console.error("Error fetching custom variables for form:", e);
+        }
 
-        <div id="keywordField" style="display:none;">
-            <label for="keyword">Keyword(s):</label>
-            <input name="keyword" id="keyword" value="${r.keyword || ''}" />
-        </div>
-
-        <div id="patternField" style="display:none;">
-            <label for="pattern">Regex Pattern:</label>
-            <input name="pattern" id="pattern" value="${r.pattern || ''}" />
-        </div>
-
-       <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-<textarea name="replies" id="replies">${r.replies.join(' <#> ')}</textarea>
-
-<button type="button" onclick="toggleVariableList(this)">🧠 Insert Variable</button>
-<ul id="existingVars" style="display:none; padding:10px; margin-top:10px; border:1px solid #ccc; background:#f9f9f9;">
-    ${customVariables.map(v => `<li style="cursor:pointer;" onclick="insertVariable('%${v.name}%')"><code>%${v.name}%</code></li>`).join('')}
-</ul>
-
-<script>
-function toggleVariableList(button) {
-  const form = button.closest('form');
-  const list = form.querySelector('.variable-dropdown'); // Use closest dropdown
-  const textarea = form.querySelector('textarea'); // Find the correct textarea
-
-  if (!list || !textarea) return;
-
-  list.innerHTML = '';
-  allVariables.forEach(v => {
-    const li = document.createElement('li');
-    li.textContent = v;
-    li.style.cursor = 'pointer';
-    li.onmousedown = () => {
-      insertVariable(v, textarea, list);
-    };
-    list.appendChild(li);
-  });
-
-  list.style.display = list.style.display === 'block' ? 'none' : 'block';
-}
-function insertVariable(v, textarea, list) {
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const text = textarea.value;
-  textarea.value = text.slice(0, start) + v + text.slice(end);
-  textarea.focus();
-  textarea.selectionEnd = start + v.length;
-  list.style.display = 'none';
-}
-</script>
-        <small>
-            **Available replacements:**<br>
-            **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
-            **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
-            **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
-            **AutoResponder:** %rule_id%<br>
-            **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
-            ${customVarList}
-        </small>
-
-        <label for="priority">Priority:</label>
-        <input type="number" name="priority" id="priority" value="${r.priority}" />
-
-        <div id="isDefaultField" style="display:none;">
-            <label for="isDefault">Is Default?</label>
-            <select name="isDefault" id="isDefault">
-                <option value="false" ${!r.isDefault ? 'selected' : ''}>No</option>
-                <option value="true" ${r.isDefault ? 'selected' : ''}>Yes</option>
+        const editReplyForm = `
+        <form method="POST" action="/admin/edit-reply/${reply._id}" id="replyForm">
+            <label for="ruleName">Rule Name:</label>
+            <input name="ruleName" id="ruleName" value="${reply.ruleName}" required />
+            <label for="sendMethod">Send Method:</label>
+            <select name="sendMethod" id="sendMethod">
+                <option value="random" ${reply.sendMethod === 'random' ? 'selected' : ''}>Random</option>
+                <option value="all" ${reply.sendMethod === 'all' ? 'selected' : ''}>All</option>
+                <option value="once" ${reply.sendMethod === 'once' ? 'selected' : ''}>Once (first one)</option>
             </select>
-        </div>
+            <h2>Edit Chat Reply</h2>
+            <label for="type">Type:</label>
+            <select name="type" id="type" required onchange="handleTypeChange()">
+                <option value="exact_match" ${reply.type === 'exact_match' ? 'selected' : ''}>Exact Match</option>
+                <option value="pattern_matching" ${reply.type === 'pattern_matching' ? 'selected' : ''}>Pattern Matching</option>
+                <option value="expert_pattern_matching" ${reply.type === 'expert_pattern_matching' ? 'selected' : ''}>Expert Regex</option>
+                <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
+                <option value="default_message" ${reply.type === 'default_message' ? 'selected' : ''}>Default Message</option>
+            </select>
 
-        <button type="submit">Update Reply</button>
-    </form>
+            <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
+                <label for="keyword">Keyword(s):</label>
+                <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
+            </div>
 
-    <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const type = "${r.type}";
-        const keywordField = document.getElementById('keywordField');
-        const patternField = document.getElementById('patternField');
-        const isDefaultField = document.getElementById('isDefaultField');
+            <div id="patternField" style="${reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
+                <label for="pattern">Regex Pattern:</label>
+                <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Only for Expert Regex. Use () for capturing groups." />
+            </div>
 
-        if (type === 'exact_match' || type === 'pattern_matching') {
-            keywordField.style.display = 'block';
-        }
-        if (type === 'expert_pattern_matching') {
-            patternField.style.display = 'block';
-        }
-        if (type === 'default_message') {
-            isDefaultField.style.display = 'block';
-        }
-    });
-    </script>
+            <label for="replies">Replies (use &lt;#&gt; between lines):</label>
+            <textarea name="replies" id="replies" required>${reply.replies.join('<#>')}</textarea>
+            <button type="button" onclick="toggleVariableList(this)">🧠 Insert Variable</button>
+            <ul id="existingVars" class="variable-dropdown"></ul>
 
-    <br>
-    <a href="/admin/reply-list">← Back to Reply List</a>
-    `;
-    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
+            <small>
+                **Available replacements:**<br>
+                **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
+                **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
+                **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
+                **AutoResponder:** %rule_id%<br>
+                **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
+                ${customVarList}
+            </small>
+
+            <label for="priority">Priority:</label>
+            <input type="number" name="priority" id="priority" value="${reply.priority}" />
+
+            <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
+                <label for="isDefault">Is Default?</label>
+                <select name="isDefault" id="isDefault">
+                    <option value="false" ${!reply.isDefault ? 'selected' : ''}>No</option>
+                    <option value="true" ${reply.isDefault ? 'selected' : ''}>Yes</option>
+                </select>
+            </div>
+
+            <button type="submit">Update Reply</button>
+        </form>
+        <a href="/admin/reply-list">← Back to List</a>
+
+        <script>
+        // Re-run handleTypeChange on page load for edit form to set initial visibility
+        document.addEventListener('DOMContentLoaded', handleTypeChange);
+        </script>
+        `;
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm));
+    } catch (error) {
+        console.error('Error fetching reply for edit:', error);
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading reply for edit.</p><br><a href="/admin/reply-list">Back to List</a>'));
+    }
 });
 
 app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
-    const { ruleName, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
-    const update = {
-    ruleName,
-    keyword: keyword || '',
-    pattern: pattern || '',
-    replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
-    priority: parseInt(priority),
-    isDefault: isDefault === 'true',
-    sendMethod: sendMethod || 'random'
-};
-    // If setting this as the default message, unset existing ones of the same type
-    if (update.isDefault) {
-        // Only unset other default_message types if this one is default
-        await ChatReply.updateMany({ type: 'default_message', _id: { $ne: req.params.id } }, { isDefault: false });
+    const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
+    const replyId = req.params.id;
+
+    if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/edit-reply/' + replyId + '">Back to Edit Reply</a>'));
+
+    try {
+        // If updating to a new default message, unset existing ones
+        if (type === 'default_message' && isDefault === 'true') {
+            await ChatReply.updateMany({ type: 'default_message', _id: { $ne: replyId } }, { isDefault: false });
+        }
+
+        await ChatReply.findByIdAndUpdate(replyId, {
+            ruleName,
+            type,
+            keyword: keyword || '',
+            pattern: pattern || '',
+            replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
+            priority: parseInt(priority),
+            isDefault: isDefault === 'true',
+            sendMethod: sendMethod || 'random'
+        });
+        res.redirect('/admin/reply-list');
+    } catch (error) {
+        console.error('Error updating reply:', error);
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating reply.</p><br><a href="/admin/edit-reply/' + replyId + '">Back to Edit Reply</a>'));
     }
-    await ChatReply.findByIdAndUpdate(req.params.id, update);
-    res.redirect('/admin/reply-list');
 });
 
 // DELETE REPLY
 app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
-    await ChatReply.findByIdAndDelete(req.params.id);
-    res.redirect('/admin/reply-list');
-});
-
-// API for updating priorities (used by drag-and-drop)
-app.post('/api/update-priorities', isAuthenticated, async (req, res) => {
-    const { updates } = req.body;
-    if (!Array.isArray(updates)) return res.status(400).json({ message: 'Invalid data' });
-
     try {
-        // Use Promise.all for concurrent updates
-        await Promise.all(updates.map(item =>
-            ChatReply.findByIdAndUpdate(item.id, { priority: item.priority })
-        ));
-        res.json({ message: 'Priorities updated' });
-    } catch (err) {
-        console.error('Error updating priorities:', err);
-        res.status(500).json({ message: 'Server error: Could not update priorities.' });
+        await ChatReply.findByIdAndDelete(req.params.id);
+        res.redirect('/admin/reply-list');
+    } catch (error) {
+        console.error('Error deleting reply:', error);
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error deleting reply.</p><br><a href="/admin/reply-list">Back to List</a>'));
     }
 });
 
-// --- Custom Variables Management Routes ---
+// --- Custom Variables Management ---
 
-// GET: Display list of custom variables
+// List Custom Variables
 app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
     try {
         const variables = await CustomVariable.find({});
         const listItems = variables.map(v => `
-            <li class="variable-item">
-                <div class="variable-name"><code>%${v.name}%</code></div>
-                <div class="variable-value">${v.value.slice(0, 80)}${v.value.length > 80 ? '...' : ''}</div>
-                <div class="actions">
-                    <a href="/admin/edit-variable/${v._id}" class="edit-btn">✏️</a>
-                    <a href="/admin/delete-variable/${v._id}" class="delete-btn" onclick="return confirm('Delete this variable?')">🗑️</a>
-                </div>
+            <li>
+                <strong>%${v.name}%</strong>: ${v.value.slice(0, 100)}${v.value.length > 100 ? '...' : ''}
+                <a href="/admin/edit-custom-variable/${v._id}">✏️ Edit</a>
+                <a href="/admin/delete-custom-variable/${v._id}" onclick="return confirm('Delete this variable?')">🗑️ Delete</a>
             </li>
         `).join('');
 
         const content = `
-            <h2>✨ Custom Chat Variables</h2>
-            <div class="admin-links">
-                <a href="/admin/add-variable">Add New Variable</a>
-                <a href="/admin/dashboard">← Back to Dashboard</a>
-            </div>
-            ${variables.length > 0 ? `<ul class="variable-list">${listItems}</ul>` : '<p>No custom variables found. Add one!</p>'}
-
-
+            <h2>🔧 Manage Custom Variables</h2>
+            <p>Define your own variables that can be used in chat replies. Use <code>%variable_name%</code> in your replies.</p>
+            <ul class="custom-var-list">${listItems}</ul>
+            <a href="/admin/add-custom-variable" class="button">➕ Add New Variable</a>
+            <a href="/admin/dashboard" class="button back-button">← Back to Dashboard</a>
             <style>
-                .variable-list {
+                .custom-var-list {
                     list-style: none;
                     padding: 0;
                     margin: 20px 0;
                 }
-                .variable-item {
+                .custom-var-list li {
+                    background: #f9f9f9;
+                    border: 1px solid #ddd;
+                    padding: 10px 15px;
+                    margin-bottom: 8px;
+                    border-radius: 5px;
                     display: flex;
                     align-items: center;
-                    justify-content: space-between;
-                    background: #fff;
-                    padding: 15px;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-                    margin-bottom: 10px;
-                    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+                    flex-wrap: wrap;
                 }
-                .variable-name {
-                    font-weight: bold;
-                    color: #007bff;
-                    flex: 0 0 200px; /* Fixed width, but can shrink */
-                    word-break: break-all; /* Break long names */
+                .custom-var-list li strong {
+                    margin-right: 10px;
+                    color: #333;
                 }
-                .variable-value {
-                    flex-grow: 1;
-                    margin-right: 20px;
-                    color: #555;
-                    word-break: break-all; /* Break long values */
+                .custom-var-list li a {
+                    margin-left: 15px;
+                    text-decoration: none;
+                    color: #2563eb;
                 }
-                .variable-item .actions {
-                    flex-shrink: 0;
-                    display: flex;
-                    gap: 8px;
-                    margin-top: 5px; /* Add some space on wrap */
+                .custom-var-list li a:hover {
+                    text-decoration: underline;
                 }
-                 @media (max-width: 600px) {
-                    .variable-item {
-                        flex-direction: column;
-                        align-items: flex-start;
-                    }
-                    .variable-name, .variable-value {
-                        width: 100%;
-                        margin-right: 0;
-                        margin-bottom: 5px;
-                    }
-                    .variable-item .actions {
-                        width: 100%;
-                        justify-content: flex-end;
-                    }
+                .custom-var-list li .delete {
+                    color: #ef4444;
+                }
+                .button {
+                    display: inline-block;
+                    background-color: #4f46e5;
+                    color: #fff;
+                    padding: 10px 15px;
+                    border-radius: 6px;
+                    text-decoration: none;
+                    margin-top: 20px;
+                    margin-right: 10px;
+                    transition: background 0.3s;
+                }
+                .button:hover {
+                    background-color: #4338ca;
+                }
+                .back-button {
+                    background-color: #6b7280;
+                }
+                .back-button:hover {
+                    background-color: #4b5563;
                 }
             </style>
         `;
-            res.set('Content-Type', 'text/html').send(getHtmlTemplate('Custom Variables', content));
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Manage Custom Variables', content));
     } catch (error) {
-        console.error("Error fetching custom variables:", error);
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading custom variables.</p><br><a href="/admin/dashboard">Back to Dashboard</a>'));
+        console.error('Error listing custom variables:', error);
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading custom variables.</p>'));
     }
 });
 
-// GET: Add new variable form
-app.get('/admin/add-variable', isAuthenticated, async (req, res) => {
-    try {
-        const variables = await CustomVariable.find({});
-        const addVariableForm = `
-        <form method="POST" action="/admin/add-variable">
-            <h2>Add New Custom Variable</h2>
-            <label for="name">Variable Name:</label>
-            <input name="name" id="name" placeholder="e.g. product_name" required />
-
+// Add Custom Variable Form
+app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
+    const form = `
+        <h2>➕ Add New Custom Variable</h2>
+        <form method="POST" action="/admin/add-custom-variable">
+            <label for="name">Variable Name (e.g., my_city, admin_email):</label>
+            <input name="name" id="name" placeholder="Should be unique, no spaces, e.g., welcome_greeting" required pattern="^[a-zA-Z0-9_]+$" title="Only letters, numbers, and underscores."/>
             <label for="value">Variable Value:</label>
-            <textarea name="value" id="value" required></textarea>
-
-            <button type="button" onclick="toggleVariableList()">🧠 Show Existing Variables</button>
-            <ul id="existingVars" style="display:none; padding: 10px; margin-top: 10px; border: 1px solid #ccc; background: #f9f9f9;">
-                ${variables.map(v => `<li style="cursor:pointer;" onclick="fillVariable('${v.value.replace(/'/g, "\\'")}')"><code>%${v.name}%</code>: ${v.value}</li>`).join('')}
-            </ul>
-
-            <br><br><button type="submit">Add Variable</button>
+            <textarea name="value" id="value" placeholder="The actual text this variable will replace. Can contain other variables like %hour%." required></textarea>
+            <button type="button" onclick="toggleVariableList(this)">🧠 Insert Variable</button>
+            <ul id="existingVars" class="variable-dropdown"></ul>
+            <small>
+                **Available replacements:**<br>
+                **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
+                **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
+                **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
+                **AutoResponder:** %rule_id%<br>
+                **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
+            </small>
+            <button type="submit">Add Variable</button>
         </form>
-
-        <script>
-function toggleVariableList(button) {
-  const form = button.closest('form');
-  const list = form.querySelector('.variable-dropdown'); // Use closest dropdown
-  const textarea = form.querySelector('textarea'); // Find the correct textarea
-
-  if (!list || !textarea) return;
-
-  list.innerHTML = '';
-  allVariables.forEach(v => {
-    const li = document.createElement('li');
-    li.textContent = v;
-    li.style.cursor = 'pointer';
-    li.onmousedown = () => {
-      insertVariable(v, textarea, list);
-    };
-    list.appendChild(li);
-  });
-
-  list.style.display = list.style.display === 'block' ? 'none' : 'block';
-}
-
-        function fillVariable(val) {
-            document.getElementById('value').value = val;
-        }
-        </script>
-        <br>
-        <a href="/admin/custom-variables">← Back to Custom Variables</a>
-        `;
-        res.set({
-            'Content-Type': 'text/html',
-            'Content-Disposition': 'inline'
-        }).send(getHtmlTemplate('Add Variable', addVariableForm));
-    } catch (error) {
-        console.error("Add Variable Load Error:", error);
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading form</p><a href="/admin/dashboard">Back</a>'));
-    }
+        <a href="/admin/custom-variables" class="button back-button">← Back to Variables</a>
+    `;
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Custom Variable', form));
 });
 
-// POST: Handle adding new variable
-app.post('/admin/add-variable', isAuthenticated, async (req, res) => {
-    let { name, value } = req.body;
-    if (!name || !value) {
-        return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Variable name and value are required.</p><br><a href="/admin/add-variable">Back</a>'));
-    }
-
-    // Clean: space to underscore, lowercase
-    name = name.trim().replace(/\s+/g, '_').toLowerCase();
-
-    if (!/^[a-z0-9_]+$/.test(name)) {
-        return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Variable name must contain only letters, numbers, and underscores.</p><br><a href="/admin/add-variable">Back</a>'));
-    }
-
+// Add Custom Variable POST
+app.post('/admin/add-custom-variable', isAuthenticated, async (req, res) => {
+    const { name, value } = req.body;
     try {
-        const newVariable = new CustomVariable({ name, value: value.trim() });
+        const newVariable = new CustomVariable({ name: name.trim(), value });
         await newVariable.save();
         res.redirect('/admin/custom-variables');
     } catch (error) {
-        if (error.code === 11000) {
-            return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>This variable already exists.</p><br><a href="/admin/add-variable">Back</a>'));
+        console.error('Error adding custom variable:', error);
+        let errorMessage = 'Error adding custom variable.';
+        if (error.code === 11000) { // Duplicate key error
+            errorMessage = `Variable name '%${name}%' already exists. Please choose a different name.`;
         }
-        console.error("Error adding variable:", error);
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Server error while adding variable.</p><br><a href="/admin/add-variable">Back</a>'));
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', `<p>${errorMessage}</p><br><a href="/admin/add-custom-variable">Try again</a>`));
     }
 });
 
-// GET: Edit variable form
-app.get('/admin/edit-variable/:id', isAuthenticated, async (req, res) => {
+// Edit Custom Variable Form
+app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
     try {
         const variable = await CustomVariable.findById(req.params.id);
         if (!variable) {
-            return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Variable not found.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+            return res.status(404).set('Content-Type', 'text/html').send(getHtmlTemplate('Not Found', '<p>Variable not found.</p><br><a href="/admin/custom-variables">Back to List</a>'));
         }
-        const editVariableForm = `
-            <form method="POST" action="/admin/edit-variable/${variable._id}">
-                <h2>Edit Custom Variable</h2>
-                <label for="name">Variable Name (read-only):</label>
-                <input name="name" id="name" value="${variable.name}" readonly />
+
+        const form = `
+            <h2>✏️ Edit Custom Variable</h2>
+            <form method="POST" action="/admin/edit-custom-variable/${variable._id}">
+                <label for="name">Variable Name:</label>
+                <input name="name" id="name" value="${variable.name}" readonly title="Variable name cannot be changed." />
                 <label for="value">Variable Value:</label>
                 <textarea name="value" id="value" required>${variable.value}</textarea>
+                <button type="button" onclick="toggleVariableList(this)">🧠 Insert Variable</button>
+                <ul id="existingVars" class="variable-dropdown"></ul>
+                <small>
+                    **Available replacements:**<br>
+                    **Message:** %message%, %message_LENGTH%, %capturing_group_ID%<br>
+                    **Name:** %name%, %first_name%, %last_name%, %chat_name%<br>
+                    **Date & Time:** %date%, %time%, %hour%, %hour_short%, %hour_of_day%, %hour_of_day_short%, %minute%, %second%, %millisecond%, %am/pm%, %day_of_month%, %day_of_month_short%, %month%, %month_short%, %month_name%, %month_name_short%, %year%, %year_short%, %day_of_week%, %day_of_week_short%<br>
+                    **AutoResponder:** %rule_id%<br>
+                    **Random:** %rndm_num_A_B%, %rndm_custom_LENGTH_A,B,C%, %rndm_abc_lower_LENGTH%, %rndm_abc_upper_LENGTH%, %rndm_abc_LENGTH%, %rndm_abcnum_lower_LENGTH%, %rndm_abcnum_upper_LENGTH%, %rndm_abcnum_LENGTH%, %rndm_ascii_LENGTH%, %rndm_symbol_LENGTH%, %rndm_grawlix_LENGTH%
+                </small>
                 <button type="submit">Update Variable</button>
             </form>
-            <br>
-            <a href="/admin/custom-variables">← Back to Custom Variables</a>
+            <a href="/admin/custom-variables" class="button back-button">← Back to Variables</a>
         `;
-          res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Variable', editVariableForm));
+        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Custom Variable', form));
     } catch (error) {
-        console.error("Error fetching variable for edit:", error);
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading variable for editing.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+        console.error('Error fetching custom variable for edit:', error);
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading variable for edit.</p><br><a href="/admin/custom-variables">Back to List</a>'));
     }
 });
 
-// POST: Handle updating variable
-app.post('/admin/edit-variable/:id', isAuthenticated, async (req, res) => {
-    const { value } = req.body;
+// Edit Custom Variable POST
+app.post('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => {
+    const { value } = req.body; // Name is readonly, so only value can be updated
     try {
-        await CustomVariable.findByIdAndUpdate(req.params.id, { value: value.trim() });
+        await CustomVariable.findByIdAndUpdate(req.params.id, { value });
         res.redirect('/admin/custom-variables');
     } catch (error) {
-        console.error("Error updating variable:", error);
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating custom variable.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+        console.error('Error updating custom variable:', error);
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error updating custom variable.</p><br><a href="/admin/edit-custom-variable/' + req.params.id + '">Try again</a>'));
     }
 });
 
-// GET: Delete variable
-app.get('/admin/delete-variable/:id', isAuthenticated, async (req, res) => {
+// Delete Custom Variable
+app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) => {
     try {
         await CustomVariable.findByIdAndDelete(req.params.id);
         res.redirect('/admin/custom-variables');
     } catch (error) {
-        console.error("Error deleting variable:", error);
-        res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error deleting custom variable.</p><br><a href="/admin/custom-variables">Back to Custom Variables</a>'));
+        console.error('Error deleting custom variable:', error);
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error deleting custom variable.</p><br><a href="/admin/custom-variables">Back to List</a>'));
+    }
+});
+
+// API endpoint for client-side JS to get custom variables (optional, for dropdown suggestions)
+app.get('/api/custom-variables', isAuthenticated, async (req, res) => {
+    try {
+        const customVariables = await CustomVariable.find({}, 'name'); // Only send name
+        res.json(customVariables);
+    } catch (error) {
+        console.error('Error fetching custom variables for API:', error);
+        res.status(500).json({ message: 'Error fetching custom variables.' });
     }
 });
 
 
 // --- Server Start ---
 app.listen(PORT, () => {
-    console.log(`NOBITA Bot Server Running @ http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
-
