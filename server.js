@@ -388,7 +388,7 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
-                <span class="reply-title">${r.ruleName.toUpperCase()} ${getReplyIcon(r)}</span>
+                <span class="reply-title">${(r.ruleName || 'Untitled').toUpperCase()} ${getReplyIcon(r)}</span>
             </div>
             <div class="reply-inner">
                 <div class="reply-row">
@@ -766,5 +766,5 @@ app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) =
 
 // ========== SERVER START ==========
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Nobita's Server running on port ${PORT}`);
 });
