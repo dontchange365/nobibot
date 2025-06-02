@@ -85,7 +85,8 @@ function getHtmlTemplate(title, bodyContent) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${title}</title>
         <link rel="stylesheet" href="/style.css">
-   .variable-dropdown {
+   <style>
+.variable-dropdown {
       position: absolute;
       background: #fff;
       border: 1px solid #ddd;
@@ -104,6 +105,7 @@ function getHtmlTemplate(title, bodyContent) {
     .variable-dropdown li:hover {
       background-color: #f0f0f0;
     }
+    </style>
      </head>
     <body>
         ${bodyContent}
