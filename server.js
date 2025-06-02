@@ -379,8 +379,14 @@ function formatReceive(r) {
     return (r.keyword || r.pattern || '-');
 }
 function formatSend(r) {
-    return (r.replies || []).join('<#>').slice(0, 600) + ((r.replies.join('<#>').length > 600) ? ' ...' : '');
-}
+    let replyText = (r.replies || []).join(' <#> ');
+    // Remove line breaks for preview
+    replyText = replyText.replace(/\n/g, ' ');
+    // Split into words
+    const words = replyText.split(/\s+/);
+    if (words.length <= 20) return replyText;
+    return words.slice(0, 20).join(' ') + ' ...';
+
 
 // ========== Stylish /admin/reply-list Route ==========
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
@@ -766,5 +772,5 @@ app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) =
 
 // ========== SERVER START ==========
 app.listen(PORT, () => {
-    console.log(`Nobita's Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
