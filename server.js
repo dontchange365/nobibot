@@ -139,6 +139,38 @@ function formatSend(r) {
 // --- getHtmlTemplate (Defined once here) ---
 function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeDashboardStyles = false, includeCustomVarStyles = false, includeImportExportStyles = false) {
     let styles = '';
+    
+    // Global/Shared CSS
+    styles += `
+        <style>
+            /* BUTTONS BAR */
+            .top-bar { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 20px; }
+            .top-btn { flex: 1 1 0; background: linear-gradient(90deg, #af7cf5 30%, #854ee8 100%); color: #fff; border: none; border-radius: 10px; padding: 12px 0; font-weight: 700; font-size: 1.05rem; cursor: pointer; text-align: center; box-shadow: 0 1.5px 7px #cbb0ef20; transition: background 0.15s, transform 0.14s; }
+            .top-btn:hover { background: linear-gradient(90deg,#854ee8 20%,#af7cf5 100%); transform: scale(1.03);}
+            
+            /* VAR ACTIONS */
+            .var-actions { display: flex; gap: 7px; margin-left: auto;}
+            .var-actions button { background: transparent; border: none; color: #854ee8; font-size: 1.2rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: background 0.12s;}
+            .var-actions button:hover { background: #ede0ff; }
+            
+            /* REPLY CARD DIVIDER */
+            .reply-card-divider { border-top: 1.2px solid #4f448a33; margin: 8px 0 6px 0;}
+            
+            /* BACK BUTTON */
+            .back-btn { display: inline-flex; align-items: center; gap: 7px; background: #281d39; color: #fff; border: none; padding: 8px 16px; border-radius: 7px; font-weight: 700; font-size: 1rem; box-shadow: 0 1.5px 9px #a671f333; text-decoration: none; cursor: pointer; margin-bottom: 19px;}
+            .back-btn:hover { background: #7c3aed; color: #fff; }
+
+            /* General Lucide icon styling for buttons */
+            .top-btn .lucide, .back-btn .lucide, .reply-icon-btn .lucide {
+                stroke: currentColor; /* Use button's text color */
+                fill: none;
+                stroke-width: 2.2;
+                width: 20px;
+                height: 20px;
+            }
+        </style>
+    `;
+
     if (includeFormStyles) {
         styles += `
         <style>
@@ -309,50 +341,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 transform: scale(0.98);
                 box-shadow: 0 3px 7px #b48ffa55;
             }
-
-            .back-btn {
-                position: absolute;
-                top: 19px;
-                left: 19px;
-                background: rgba(155,105,255,0.13);
-                color: #7427bf;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 7px;
-                font-weight: 700;
-                font-size: 1rem;
-                display: flex;
-                align-items: center;
-                gap: 7px;
-                box-shadow: 0 1.5px 9px #cbb0ef35;
-                transition: background .14s, color .14s, transform .12s, box-shadow .14s;
-                text-decoration: none;
-                cursor: pointer;
-                z-index: 10;
-            }
-            .back-btn:hover {
-                background: #e8dfff;
-                color: #502283;
-                box-shadow: 0 2px 12px #cbb0ef55;
-            }
-            .back-btn:active {
-                background: #e0ccff;
-                color: #412276;
-                transform: scale(.98);
-                box-shadow: 0 1px 5px #cbb0ef35;
-            }
-            .back-btn svg {
-                stroke: #7427bf;
-                transition: stroke .14s;
-            }
-            .back-btn:hover svg {
-                stroke: #502283;
-            }
-            .back-btn:active svg {
-                    stroke: #412276;
-            }
-
-
+            
             /* Variable Popup Styling */
             #varPopup {
                 transition: opacity 0.2s ease-in-out;
@@ -449,7 +438,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
             }
             .card-grid {
                 display: grid;
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Responsive columns */
                 gap: 22px;
                 margin-bottom: 40px;
             }
@@ -669,42 +658,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 margin: 38px auto 0 auto;
                 padding: 0 10px 40px 10px;
             }
-            .top-bar {
-                display: flex;
-                justify-content: flex-start; /* Aligned to start */
-                gap: 15px; /* Spacing between buttons */
-                margin-bottom: 30px;
-            }
-            .top-btn {
-                background: linear-gradient(90deg, #7e4af5 40%, #bf51e8 100%);
-                color: #fff;
-                border: none;
-                border-radius: 9px;
-                padding: 10px 18px;
-                font-size: 0.98rem;
-                font-weight: 600;
-                cursor: pointer;
-                box-shadow: 0 2px 9px #ab7fee40;
-                transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
-                display: flex;
-                align-items: center;
-                gap: 7px;
-                text-decoration: none; /* For links */
-            }
-            .top-btn:hover {
-                background: linear-gradient(90deg, #6124d4 40%, #8227b3 100%);
-                transform: translateY(-2px);
-                box-shadow: 0 4px 14px #ab7fee60;
-            }
-            .top-btn:active {
-                transform: translateY(0);
-                box-shadow: 0 1px 5px #ab7fee40;
-            }
-            .top-btn .lucide {
-                width: 18px;
-                height: 18px;
-            }
-
+            
             .big-head {
                 font-size: 2.1rem;
                 color: #7023d8;
@@ -764,26 +718,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 text-overflow: ellipsis;
                 max-width: calc(100% - 70px); /* Adjust for buttons */
             }
-            .var-actions {
-                display: flex;
-                gap: 8px;
-            }
-            .var-actions button {
-                background: none;
-                border: none;
-                color: #7d38a8;
-                cursor: pointer;
-                padding: 5px;
-                border-radius: 5px;
-                transition: background 0.15s, color 0.15s;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            .var-actions button:hover {
-                background: #e2d6ff;
-                color: #4a1d82;
-            }
+            
             .var-actions .lucide {
                 width: 18px;
                 height: 18px;
@@ -1552,21 +1487,25 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
         <div class="reply-card">
             <div class="reply-header">
                 <span class="reply-name"><b>${(r.ruleName || 'Untitled').toUpperCase()}</b> <span class="reply-priority">${r.priority}</span> ${getReplyIcon(r)}</span>
+                <div class="reply-actions">
+                    <a href="/admin/edit-reply/${r._id.toString()}" title="Edit"> <i class="lucide lucide-pencil"></i>
+                    </a>
+                    <a href="/admin/delete-reply/${r._id.toString()}" title="Delete" onclick="return confirm('Delete this rule?')"> <i class="lucide lucide-trash-2"></i>
+                    </a>
+                </div>
             </div>
+            <div class="reply-card-divider"></div>
             <div class="reply-body">
                 <div class="reply-receive">${formatReceive(r)}</div>
                 <div class="reply-send">${formatSend(r)}</div>
-            </div>
-            <div class="reply-actions">
-                <a href="/admin/edit-reply/${r._id.toString()}" title="Edit"> <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
-                </a>
-                <a href="/admin/delete-reply/${r._id.toString()}" title="Delete" onclick="return confirm('Delete this rule?')"> <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg>
-                </a>
             </div>
         </div>
     `).join('');
     const content = `
         <div class="nobita-reply-panel">
+            <a href="/admin/dashboard" class="back-btn">
+                <i class="lucide lucide-arrow-left"></i> Back to Dashboard
+            </a>
             <div class="reply-list-header">
                 <h2 class="nobita-title">REPLY LIST</h2>
                 <a href="/admin/add-chat-replies" class="add-reply-btn-top">
@@ -1577,7 +1516,6 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
             <div class="reply-list">
                 ${listItems || '<em style="color:#f8e9ff; text-align:center; display:block;">No replies found.</em>'}
             </div>
-            <a class="btn back" href="/admin/dashboard" style="margin-top:24px;">← Back to Dashboard</a>
         </div>
         `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content, false, true));
@@ -1802,8 +1740,8 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
         const content = `
         <div class="custom-vars-panel">
             <div class="top-bar">
-                <a href="/admin/dashboard" class="top-btn dash"><i class="lucide lucide-home"></i> Dashboard</a>
-                <a href="/admin/add-custom-variable" class="top-btn add"><i class="lucide lucide-plus-circle"></i> Add New Variable</a>
+                <a href="/admin/add-custom-variable" class="top-btn"><i class="lucide lucide-plus"></i> Add New</a>
+                <a href="/admin/dashboard" class="top-btn"><i class="lucide lucide-home"></i> Dashboard</a>
             </div>
             <h2 class="big-head">Manage Custom Variables</h2>
             <div class="custom-var-list">${listItems || '<em style="color:#6a3cc9; text-align:center; display:block;">No variables found.</em>'}</div>
@@ -1835,8 +1773,8 @@ app.get('/admin/add-custom-variable', isAuthenticated, (req, res) => {
     const form = `
         <div class="edit-var-panel">
             <div class="top-bar">
-                <a href="/admin/custom-variables" class="top-btn dash"><i class="lucide lucide-list"></i> All Variables</a>
-                <a href="/admin/dashboard" class="top-btn add"><i class="lucide lucide-home"></i> Dashboard</a>
+                <a href="/admin/custom-variables" class="top-btn"><i class="lucide lucide-list"></i> All Variables</a>
+                <a href="/admin/dashboard" class="top-btn"><i class="lucide lucide-home"></i> Dashboard</a>
             </div>
             <form method="POST" action="/admin/add-custom-variable" class="edit-var-form fadein">
                 <h2 class="edit-head"><i class="lucide lucide-plus-circle"></i> Add New Custom Variable</h2>
@@ -1884,8 +1822,8 @@ app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => 
         const form = `
             <div class="edit-var-panel">
             <div class="top-bar">
-                <a href="/admin/custom-variables" class="top-btn dash"><i class="lucide lucide-list"></i> All Variables</a>
-                <a href="/admin/dashboard" class="top-btn add"><i class="lucide lucide-home"></i> Dashboard</a>
+                <a href="/admin/custom-variables" class="top-btn"><i class="lucide lucide-list"></i> All Variables</a>
+                <a href="/admin/dashboard" class="top-btn"><i class="lucide lucide-home"></i> Dashboard</a>
             </div>
             <form method="POST" action="/admin/edit-custom-variable/${variable._id}" class="edit-var-form fadein">
                 <h2 class="edit-head"><i class="lucide lucide-pencil"></i> Edit Custom Variable</h2>
@@ -1938,10 +1876,7 @@ app.get('/admin/import-export-rules', isAuthenticated, (req, res) => {
     const html = `
     <div class="admin-container">
         <a href="/admin/dashboard" class="back-btn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-            Back to Dashboard
+            <i class="lucide lucide-arrow-left"></i> Back to Dashboard
         </a>
         <h1>Import / Export Rules</h1>
         <div style="display:flex;gap:22px;flex-wrap:wrap;">
