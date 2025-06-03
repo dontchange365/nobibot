@@ -102,7 +102,12 @@ function getReplyIcon(r) {
 function formatReceive(r) {
     const text = (r.type === 'exact_match' || r.type === 'pattern_matching') ? r.keyword : (r.type === 'expert_pattern_matching' ? r.pattern : (r.keyword || r.pattern || ''));
     // Ensure text is HTML-escaped before embedding in HTML
-    const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;');
+    const escapedText = text
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#039;");
     return `<span class="receive-text">${trimText(escapedText, 5)}</span>`;
 }
 
@@ -110,7 +115,12 @@ function formatReceive(r) {
 function formatSend(r) {
     const text = (r.replies || []).join('<#>');
     // Ensure text is HTML-escaped before embedding in HTML
-    const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;');
+    const escapedText = text
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#039;");
     return escapedText;
 }
 
