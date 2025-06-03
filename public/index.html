@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -277,6 +276,15 @@
     <input type="text" id="message-input" placeholder="Message 👉 NOBI BOT🤘..." autocomplete="off" />
     <button id="send-btn">➤</button>
   </div>
+
+  <div id="name-modal" style="position:fixed;left:0;top:0;width:100vw;height:100vh;background:#000a;z-index:10000;display:flex;align-items:center;justify-content:center;">
+    <div style="background:#222;border-radius:18px;padding:32px 24px;box-shadow:0 6px 40px #7c3aed66;max-width:90vw;">
+      <h2 style="color:#8b5cf6;margin-bottom:18px;text-align:center;">👋 Apna Naam Bata</h2>
+      <input type="text" id="userNameInput" placeholder="Apna naam daal..." style="width:100%;font-size:18px;padding:14px 11px;border-radius:8px;border:none;background:#17112b;color:#fff;margin-bottom:17px;"/>
+      <button onclick="saveUserName()" style="background:#8b5cf6;color:#fff;border:none;padding:12px 34px;border-radius:9px;font-weight:700;font-size:1.1rem;cursor:pointer;box-shadow:0 1.5px 9px #cbb0ef55;">Shuru Kar</button>
+    </div>
+  </div>
+
   <script>
     function setRealVh() {
       document.documentElement.style.setProperty('--vh', `${window.innerHeight}px`);
@@ -329,10 +337,11 @@
       showTyping(true);
 
       try {
+        const name = localStorage.getItem('user_name') || ''; // Get name from localStorage
         const res = await fetch('/api/chatbot/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: msg })
+          body: JSON.stringify({ message: msg, name }) // Send name with message
         });
         const data = await res.json();
 
@@ -350,6 +359,46 @@
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter') sendMessage();
     });
+
+    // Check localStorage for name, show modal if not present
+    window.addEventListener('DOMContentLoaded', () => {
+      if (!localStorage.getItem('user_name')) {
+        document.getElementById('name-modal').style.display = 'flex';
+        document.getElementById('input-area').style.display = 'none';
+      } else {
+        document.getElementById('name-modal').style.display = 'none';
+        document.getElementById('input-area').style.display = 'flex';
+        // Optional: Send name to backend when chat is loaded if it's already in localStorage
+        // This ensures the backend session is set up immediately even if the user didn't open the modal
+        const existingName = localStorage.getItem('user_name');
+        if (existingName) {
+            fetch('/api/chatbot/set-name', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: existingName })
+            });
+        }
+      }
+    });
+
+    // Save name and call backend to set it
+    async function saveUserName() {
+      const name = document.getElementById('userNameInput').value.trim();
+      if (!name) {
+        document.getElementById('userNameInput').focus();
+        return;
+      }
+      localStorage.setItem('user_name', name);
+      document.getElementById('name-modal').style.display = 'none';
+      document.getElementById('input-area').style.display = 'flex';
+
+      // CALL BACKEND TO SET USER NAME IN SESSION + DB
+      await fetch('/api/chatbot/set-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+    }
   </script>
 </body>
 </html>
