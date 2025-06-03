@@ -239,7 +239,7 @@
   background-color: #005f99;
   transform: scale(0.96);
 }
-</style>
+  </style>
 </head>
 <body>
   <div class="topbar">
@@ -259,7 +259,6 @@
       <p>12k followers · 0 posts</p>
       <p>You both follow nobibot.host</p>
       <button class="view-btn">View profile</button><br>
-      
     </div>
   </div>
   <div id="typing">
@@ -286,28 +285,32 @@
   </div>
 
   <script>
+    // ==== UTILS ====
+    function getUrlParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name) || '';
+    }
+
     function setRealVh() {
       document.documentElement.style.setProperty('--vh', `${window.innerHeight}px`);
     }
     setRealVh();
     window.addEventListener('resize', setRealVh);
 
+    // ==== DOM NODES ====
     const chatContainer = document.getElementById('chat-container');
     const input = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
     const typing = document.getElementById('typing');
-
-    // Chat history array and initialization
     let chatHistory = JSON.parse(localStorage.getItem('nobi_chat') || '[]');
 
+    // ==== MESSAGES ====
     function appendUserMessage(msg) {
       const div = document.createElement('div');
       div.className = 'msg user-msg';
       div.innerText = msg;
       chatContainer.appendChild(div);
       chatContainer.scrollTop = chatContainer.scrollHeight;
-
-      // --- Save to chat history ---
       chatHistory.push({ from: 'user', text: msg });
       localStorage.setItem('nobi_chat', JSON.stringify(chatHistory));
     }
@@ -315,25 +318,27 @@
     function appendBotMessage(msg) {
       const wrapper = document.createElement('div');
       wrapper.className = 'bot-msg-wrapper';
-
       const avatar = document.createElement('img');
       avatar.src = 'nobibot.png';
       avatar.alt = 'Bot';
       avatar.className = 'avatar';
-
       const bubble = document.createElement('div');
       bubble.className = 'msg bot-msg';
       bubble.innerText = msg;
-
       wrapper.appendChild(avatar);
       wrapper.appendChild(bubble);
-
       chatContainer.appendChild(wrapper);
-      chatContainer.scrollTop = chatContainer.scrollTop + chatContainer.scrollHeight; // Adjusted for correct scroll
-
-      // --- Save to chat history ---
+      chatContainer.scrollTop = chatContainer.scrollTop + chatContainer.scrollHeight;
       chatHistory.push({ from: 'bot', text: msg });
       localStorage.setItem('nobi_chat', JSON.stringify(chatHistory));
+      // ==== PARENT PING ====
+      if (msg && msg.toLowerCase().includes('welcome')) {
+        try {
+          if (window.top !== window.self) {
+            window.parent.postMessage("nobi-welcome-seen", "*");
+          }
+        } catch(e) {}
+      }
     }
 
     function showTyping(show = true) {
@@ -348,11 +353,11 @@
       showTyping(true);
 
       try {
-        const name = localStorage.getItem('user_name') || ''; // Get name from localStorage
+        const name = localStorage.getItem('user_name') || '';
         const res = await fetch('/api/chatbot/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: msg, name }) // Send name with message
+          body: JSON.stringify({ message: msg, name })
         });
         const data = await res.json();
 
@@ -371,37 +376,47 @@
       if (e.key === 'Enter') sendMessage();
     });
 
-    // Page Load Logic: Restore Chat History and Handle Name Modal
-    window.addEventListener('DOMContentLoaded', () => {
-      // Restore chat history first
+    // ==== PAGE LOAD: HISTORY, MODALS, URL PARAMS ====
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Restore chat history
       chatHistory.forEach(msg => {
         if (msg.from === 'user') appendUserMessage(msg.text);
         else appendBotMessage(msg.text);
       });
-      // Ensure scroll to bottom after history is loaded
       chatContainer.scrollTop = chatContainer.scrollHeight;
 
-      // Then handle name modal logic
-      if (!localStorage.getItem('user_name')) {
-        document.getElementById('name-modal').style.display = 'flex';
-        document.getElementById('input-area').style.display = 'none';
-      } else {
+      // ====== URL PARAMS ======
+      const username = getUrlParam('username');
+      const seenWelcome = getUrlParam('seenWelcome');
+      const nameInput = document.getElementById('userNameInput');
+
+      // --- Username via URL? Set Local & Auto-login
+      if (username) {
+        localStorage.setItem('user_name', username);
+        if (nameInput) nameInput.value = username;
         document.getElementById('name-modal').style.display = 'none';
         document.getElementById('input-area').style.display = 'flex';
-        // Optional: Send name to backend when chat is loaded if it's already in localStorage
-        // This ensures the backend session is set up immediately even if the user didn't open the modal
-        const existingName = localStorage.getItem('user_name');
-        if (existingName) {
-            fetch('/api/chatbot/set-name', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: existingName })
-            });
-        }
+        await fetch('/api/chatbot/set-name', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: username })
+        });
+      }
+      // --- seenWelcome via URL? Mark welcome as seen
+      if (seenWelcome === 'true') {
+        localStorage.setItem('nobi_seen_welcome', 'yes');
+      }
+      // --- Name Modal/Field ---
+      if (username || localStorage.getItem('user_name')) {
+        document.getElementById('name-modal').style.display = 'none';
+        document.getElementById('input-area').style.display = 'flex';
+      } else {
+        document.getElementById('name-modal').style.display = 'flex';
+        document.getElementById('input-area').style.display = 'none';
       }
     });
 
-    // Save name and call backend to set it
+    // ==== SAVE NAME ====
     async function saveUserName() {
       const name = document.getElementById('userNameInput').value.trim();
       if (!name) {
@@ -411,30 +426,12 @@
       localStorage.setItem('user_name', name);
       document.getElementById('name-modal').style.display = 'none';
       document.getElementById('input-area').style.display = 'flex';
-
-      // CALL BACKEND TO SET USER NAME IN SESSION + DB
       await fetch('/api/chatbot/set-name', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
       });
     }
-
-// ===== AUTO-FILL USERNAME FROM URL =====
-function getUrlParam(name) {
-    const params = new URLSearchParams(window.location.search);
-    return params.get(name) || '';
-}
-window.addEventListener('DOMContentLoaded', function () {
-    const username = getUrlParam('username');
-    if (username) {
-        const nameInput = document.getElementById('userNameInput');
-        if (nameInput) {
-            nameInput.value = username;
-        }
-    }
-});
-
   </script>
 </body>
 </html>
