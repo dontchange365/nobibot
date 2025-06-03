@@ -885,7 +885,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
       });
 
       // Close popup if clicked outside (on the overlay)
-      varPopup.addEventListener('click', function(e){
+      document.addEventListener('click', function(e){ // Changed from varPopup.addEventListener
           if (e.target === varPopup) {
               varPopup.style.opacity = '0';
               varPopup.style.pointerEvents = 'none';
@@ -1054,53 +1054,78 @@ app.get('/', (req, res) => {
 
 // --- Chatbot Message API Route (Defined once here) ---
 app.post('/api/chatbot/message', async (req, res) => {
-    const userMessage = req.body.message;
+    const { message } = req.body; // Destructure message from req.body
     let botReply = "Sorry, I didn't understand that.";
-    let matchedRegexGroups = null;
+    let matchedRegexGroups = null; // Initialize matchedRegexGroups to null
 
     if (!req.session.seenWelcome) {
         req.session.seenWelcome = true;
         try {
             const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
             if (welcomeReply) {
-                return res.json({ reply: await handleReplySend(welcomeReply, userMessage, null, req.session) });
+                return res.json({ reply: await handleReplySend(welcomeReply, message, null, req.session) }); // Use 'message' instead of 'userMessage'
             }
         } catch (e) { console.error("Welcome message error:", e); }
     }
 
-    try {
-        const exact = await ChatReply.findOne({ type: 'exact_match', keyword: userMessage.toLowerCase() }).sort({ priority: -1 });
-        if (exact) return res.json({ reply: await handleReplySend(exact, userMessage, null, req.session) });
+    // 1. Exact Match
+    let exactMatch = await ChatReply.findOne({ type: 'exact_match', keyword: message.trim().toLowerCase() }); // Convert message to lowercase for keyword matching
 
-        const patterns = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 });
-        for (const reply of patterns) {
-            const keywords = reply.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
-            if (keywords.some(k => userMessage.toLowerCase().includes(k))) {
-                return res.json({ reply: await handleReplySend(reply, userMessage, null, req.session) });
+    // 2. Pattern Matching
+    let patternRules = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 }); // Sorted by priority
+    let patternMatch = null;
+    let patternPriority = -99999;
+    for (let rule of patternRules) {
+        const keywords = rule.keyword?.split(',').map(k => k.trim().toLowerCase()) || []; // Use rule.keyword and convert to lowercase
+        if (keywords.some(k => message.toLowerCase().includes(k))) { // Check if user message contains any keyword
+            if (rule.priority > patternPriority) {
+                patternMatch = rule;
+                patternPriority = rule.priority;
             }
         }
+    }
 
-        const regexMatches = await ChatReply.find({ type: 'expert_pattern_matching' }).sort({ priority: -1 });
-        for (const reply of regexMatches) {
-            try {
-                // Ensure pattern exists and is not null/empty for regex type
-                if (reply.pattern) {
-                    const regex = new RegExp(reply.pattern, 'i');
-                    const match = regex.exec(userMessage);
-                    if (match) {
-                        matchedRegexGroups = match;
-                        return res.json({ reply: await handleReplySend(reply, userMessage, matchedRegexGroups, req.session) });
+    // 3. Expert Pattern Matching
+    let expertRules = await ChatReply.find({ type: 'expert_pattern_matching' }).sort({ priority: -1 }); // Sorted by priority
+    let expertMatch = null;
+    let expertPriority = -99999;
+    for (let rule of expertRules) {
+        try { // Added try-catch for regex pattern creation
+            if (rule.pattern) { // Ensure pattern exists
+                const regex = new RegExp(rule.pattern, 'i'); // Case-insensitive regex
+                const match = regex.exec(message); // Execute regex on message
+                if (match) {
+                    if (rule.priority > expertPriority) {
+                        expertMatch = rule;
+                        expertPriority = rule.priority;
+                        matchedRegexGroups = match; // Capture groups if this rule is selected
                     }
                 }
-            } catch (e) { console.error("Regex pattern error:", e); }
-        }
-        const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
-        if (fallback) return res.json({ reply: await handleReplySend(fallback, userMessage, null, req.session) });
-    } catch (e) {
-        console.error(e);
-        botReply = "Nobi Bot error: try again later.";
+            }
+        } catch (e) { console.error("Expert Regex pattern error:", e); } // Log regex errors
     }
-    res.json({ reply: botReply });
+
+    // === MASTER SELECTION ===
+    let finalMatch = null;
+    if (expertMatch) {
+        finalMatch = expertMatch; // Expert pattern wins even if exact or pattern match exists
+    } else if (patternMatch) {
+        finalMatch = patternMatch;
+    } else if (exactMatch) {
+        finalMatch = exactMatch;
+    }
+
+    if (!finalMatch) {
+        const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true }); // Find default message
+        if (fallback) {
+            return res.json({ reply: await handleReplySend(fallback, message, null, req.session) }); // Use default fallback
+        }
+        return res.json({ reply: "Sorry, I didn't understand that." }); // Default fallback if no default message is set
+    }
+
+    // Build reply (rest of your code, variable replacement, etc)
+    // The handleReplySend function already handles sendMethod logic, so no need for manual array access here
+    return res.json({ reply: await handleReplySend(finalMatch, message, matchedRegexGroups, req.session) });
 });
 
 // ========== ADMIN ROUTES ==========
@@ -1270,9 +1295,26 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Chat Reply', addReplyForm, true));
 });
 
+// A. Add New Rule: (Updated for priority logic)
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>', true));
+
+    // Calculate total rules for validation and default priority
+    const totalRules = await ChatReply.countDocuments({});
+    let newPriority = Number(priority);
+
+    // 5. New Rule By Default Last / Validation for Add
+    if (isNaN(newPriority) || newPriority < 1 || newPriority > totalRules + 1) {
+        newPriority = totalRules + 1; // default = last
+    }
+
+    // Shift rules below this priority down
+    await ChatReply.updateMany(
+        { priority: { $gte: newPriority } },
+        { $inc: { priority: 1 } }
+    );
+
     if (type === 'default_message' && isDefault === 'true') {
         await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
     }
@@ -1282,7 +1324,7 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         keyword: keyword || '',
         pattern: pattern || '',
         replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
-        priority: parseInt(priority),
+        priority: newPriority, // Use the determined priority
         isDefault: isDefault === 'true',
         sendMethod: sendMethod || 'random'
     });
@@ -1293,11 +1335,12 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 
 // ========== Stylish /admin/reply-list Route ==========
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
-    const replies = await ChatReply.find().sort({ priority: -1 });
+    // 3. LIST REPLY SORTING: ALWAYS sort by priority ascending
+    const replies = await ChatReply.find().sort({ priority: 1 }); // Sorted by priority ascending
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
-                <span class="reply-title">${(r.ruleName || 'Untitled').toUpperCase()} ${getReplyIcon(r)}</span>
+                <span class="reply-title">${(r.ruleName || 'Untitled').toUpperCase()} ${getReplyIcon(r)} (Priority: ${r.priority})</span>
             </div>
             <div class="reply-inner">
                 <div class="reply-row">
@@ -1451,21 +1494,51 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error loading reply for edit.</p><br><a href="/admin/reply-list">Back to List</a>', true));
     }
 });
+
+// B. Edit Priority: (Updated for priority logic)
 app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     const replyId = req.params.id;
     if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/edit-reply/' + replyId + '">Back to Edit Reply</a>', true));
+
+    // Get current rule to find old priority
+    const currentReply = await ChatReply.findById(replyId);
+    if (!currentReply) return res.status(404).send(getHtmlTemplate('Error', '<p>Rule not found for update.</p><br><a href="/admin/reply-list">Back to List</a>', true));
+
+    const oldPriority = currentReply.priority;
+    const totalRules = await ChatReply.countDocuments({}); // Get total rules for validation
+    let newPriority = Number(priority);
+
+    // C. Validation (No UI, Only Backend): for Edit
+    if (isNaN(newPriority) || newPriority < 1 || newPriority > totalRules) {
+        return res.status(400).send(getHtmlTemplate('Invalid Priority', '<p>Invalid priority value. Priority must be between 1 and ' + totalRules + '.</p><br><a href="/admin/edit-reply/' + replyId + '">Try again</a>', true));
+    }
+
     try {
         if (type === 'default_message' && isDefault === 'true') {
             await ChatReply.updateMany({ type: 'default_message', _id: { $ne: replyId } }, { isDefault: false });
         }
+
+        // Shift others based on new priority
+        if (newPriority < oldPriority) {
+            await ChatReply.updateMany(
+                { priority: { $gte: newPriority, $lt: oldPriority }, _id: { $ne: replyId } },
+                { $inc: { priority: 1 } }
+            );
+        } else if (newPriority > oldPriority) {
+            await ChatReply.updateMany(
+                { priority: { $lte: newPriority, $gt: oldPriority }, _id: { $ne: replyId } },
+                { $inc: { priority: -1 } }
+            );
+        }
+
         await ChatReply.findByIdAndUpdate(replyId, {
             ruleName,
             type,
             keyword: keyword || '',
             pattern: pattern || '',
             replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
-            priority: parseInt(priority),
+            priority: newPriority, // Update with the new validated priority
             isDefault: isDefault === 'true',
             sendMethod: sendMethod || 'random'
         });
@@ -1479,7 +1552,14 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
 // ========== DELETE REPLY ==========
 app.get('/admin/delete-reply/:id', isAuthenticated, async (req, res) => {
     try {
-        await ChatReply.findByIdAndDelete(req.params.id);
+        const deletedReply = await ChatReply.findByIdAndDelete(req.params.id); // Get the deleted reply to adjust priorities below it
+        if (deletedReply) {
+            // Shift rules below the deleted priority up
+            await ChatReply.updateMany(
+                { priority: { $gt: deletedReply.priority } },
+                { $inc: { priority: -1 } }
+            );
+        }
         res.redirect('/admin/reply-list');
     } catch (error) {
         console.error('Error deleting reply:', error);
@@ -1642,6 +1722,12 @@ app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) =
 app.get('/admin/import-export-rules', isAuthenticated, (req, res) => {
     const html = `
     <div class="admin-container">
+        <a href="/admin/dashboard" class="back-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            Back to Dashboard
+        </a>
         <h1>Import / Export Rules</h1>
         <div style="display:flex;gap:22px;">
             <button class="rule-btn" onclick="showImport()">📥 Import</button>
