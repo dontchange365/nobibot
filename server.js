@@ -11,6 +11,7 @@ const fs = require('fs');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' }); // Files will be stored in an 'uploads' directory
 const csv = require('csv-parser');
+const ChatHistory = require('./models/ChatHistory');
 // --- END NEW IMPORTS ---
 
 const app = express();
