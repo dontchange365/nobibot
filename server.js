@@ -101,13 +101,17 @@ function getReplyIcon(r) {
 // Helper for formatting receive field in reply list (Defined once here)
 function formatReceive(r) {
     const text = (r.type === 'exact_match' || r.type === 'pattern_matching') ? r.keyword : (r.type === 'expert_pattern_matching' ? r.pattern : (r.keyword || r.pattern || ''));
-    return `<span class="receive-text">${trimText(text, 5)}</span>`; // Adjusted word limit for better single-line display
+    // Ensure text is HTML-escaped before embedding in HTML
+    const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    return `<span class="receive-text">${trimText(escapedText, 5)}</span>`;
 }
 
 // Helper for formatting send field in reply list (Defined once here)
 function formatSend(r) {
     const text = (r.replies || []).join('<#>');
-    return trimText(text, 20);
+    // Ensure text is HTML-escaped before embedding in HTML
+    const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    return escapedText;
 }
 
 
@@ -760,18 +764,6 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
           showVarPopup();
         }
       });
-
-      // The original reply-icon-btn which was INSIDE textarea is now removed from HTML.
-      // The new buttons use reply-icon-btn class but are handled by their specific IDs.
-      // This listener below could be generalized or removed if no other elements use this class.
-      // For safety, keeping it with closest().
-      // document.body.addEventListener('click', function(e){
-      //   if(e.target.closest('.reply-icon-btn')) {
-      //     varPopup.style.opacity = '1';
-      //     varPopup.style.pointerEvents = 'auto';
-      //     showVarPopup();
-      //   }
-      // });
     });
     </script>
     `;
@@ -1202,8 +1194,7 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, sendMethod } = req.body;
     if (!replies) return res.status(400).send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>', true));
 
-    // Calculate total rules for validation and default priority (excluding welcome messages for count if needed, but here count all)
-    // For priority management, it's safer to count all existing rules.
+    // Calculate total rules for validation and default priority
     const totalRules = await ChatReply.countDocuments({});
     let newPriority = Number(priority);
 
@@ -1218,7 +1209,6 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     }
 
     // Shift rules below this priority down
-    // This is crucial: only shift if the new rule is inserted somewhere in between
     await ChatReply.updateMany(
         { priority: { $gte: newPriority } },
         { $inc: { priority: 1 } }
@@ -1252,11 +1242,9 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
 <div class\="reply\-receive"\></span>{formatReceive(r)}</div> <div class="reply-send"><span class="math-inline">\{formatSend\(r\)\}</div\>
 </div\>
 <div class\="reply\-actions"\>
-<a href\="/admin/edit\-reply/</span>{r._id}" title="Edit">
-                  <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
+<a href\="/admin/edit\-reply/</span>{r._id.toString()}" title="Edit"> <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
                 </a>
-                <a href="/admin/delete-reply/${r._id}" title="Delete" onclick="return confirm('Delete this rule?')">
-                  <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg>
+                <a href="/admin/delete-reply/${r._id.toString()}" title="Delete" onclick="return confirm('Delete this rule?')"> <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg>
                 </a>
             </div>
         </div>
@@ -1301,9 +1289,9 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 Back
             </button>
             <h2>Edit Chat Reply</h2>
-            <form method="POST" action="/admin/edit-reply/${reply._id}">
-                <label for="ruleName">Rule Name:</label>
-                <input name="ruleName" id="ruleName" value="${reply.ruleName}" required />
+            <form method="POST" action="/admin/edit-reply/<span class="math-inline">\{reply\.\_id\}"\>
+<label for\="ruleName"\>Rule Name\:</label\>
+<input name\="ruleName" id\="ruleName" value\="</span>{reply.ruleName}" required />
 
                 <label for="sendMethod">Send Method:</label>
                 <div class="select-wrapper">
@@ -1320,39 +1308,37 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                       <option value="exact_match" ${reply.type === 'exact_match' ? 'selected' : ''}>Exact Match</option>
                       <option value="pattern_matching" ${reply.type === 'pattern_matching' ? 'selected' : ''}>Pattern Matching</option>
                       <option value="expert_pattern_matching" ${reply.type === 'expert_pattern_matching' ? 'selected' : ''}>Expert Regex</option>
-                      <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
-                  </select>
-                </div>
-
-                <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching' || reply.type === 'welcome_message') ? 'display:block;' : 'display:none;'}">
+                      <option value="welcome_message" <span class="math-inline">\{reply\.type \=\=\= 'welcome\_message' ? 'selected' \: ''\}\>Welcome Message</option\>
+</select\>
+</div\>
+<div id\="keywordField" style\="</span>{(reply.type === 'exact_match' || reply.type === 'pattern_matching' || reply.type === 'welcome_message') ? 'display:block;' : 'display:none;'}">
                     <label for="keyword">Keyword(s):</label>
-                    <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
-                </div>
-                <div id="patternField" style="${reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
+                    <input name="keyword" id="keyword" value="<span class="math-inline">\{reply\.keyword \|\| ''\}" placeholder\="e\.g\. hi, hello" /\>
+</div\>
+<div id\="patternField" style\="</span>{reply.type === 'expert_pattern_matching' ? 'display:block;' : 'display:none;'}">
                     <label for="pattern">Regex Pattern:</label>
-                    <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Only for Expert Regex. Use () for capturing groups." />
-                </div>
-
-                <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-                <div class="reply-area-buttons">
-                    <button type="button" id="customVarBtn" class="reply-icon-btn" title="Insert Variable">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
-                            <polyline points="3 8 12 13 21 8"/>
-                        </svg>
-                        Custom Replacements
-                    </button>
-                    <input type="file" id="txtUpload" accept=".txt" style="display: none;">
-                    <button type="button" id="uploadTxtBtn" class="reply-icon-btn" title="Upload TXT File">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 14.899V20a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5.1"/>
-                            <path d="M12 2v13.5"/>
-                            <path d="m7 9 5-5 5 5"/>
-                        </svg>
-                        Upload TXT
-                    </button>
-                </div>
-                <textarea name="replies" id="replyTextarea" required>${reply.replies.join('<#>')}</textarea>
+                    <input name="pattern" id="pattern" value="<span class="math-inline">\{reply\.pattern \|\| ''\}" placeholder\="Only for Expert Regex\. Use \(\) for capturing groups\." /\>
+</div\>
+<label for\="replies"\>Replies \(use &lt;\#&gt; between lines\)\:</label\>
+<div class\="reply\-area\-buttons"\>
+<button type\="button" id\="customVarBtn" class\="reply\-icon\-btn" title\="Insert Variable"\>
+<svg width\="20" height\="20" viewBox\="0 0 24 24" fill\="none" stroke\-width\="2\.2" stroke\-linecap\="round" stroke\-linejoin\="round"\>
+<path d\="M21 16V8a2 2 0 0 0\-2\-2H5a2 2 0 0 0\-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2\-2z"/\>
+<polyline points\="3 8 12 13 21 8"/\>
+</svg\>
+Custom Replacements
+</button\>
+<input type\="file" id\="txtUpload" accept\="\.txt" style\="display\: none;"\>
+<button type\="button" id\="uploadTxtBtn" class\="reply\-icon\-btn" title\="Upload TXT File"\>
+<svg width\="20" height\="20" viewBox\="0 0 24 24" fill\="none" stroke\-width\="2\.2" stroke\-linecap\="round" stroke\-linejoin\="round"\>
+<path d\="M4 14\.899V20a2 2 0 0 0 2 2h12a2 2 0 0 0 2\-2v\-5\.1"/\>
+<path d\="M12 2v13\.5"/\>
+<path d\="m7 9 5\-5 5 5"/\>
+</svg\>
+Upload TXT
+</button\>
+</div\>
+<textarea name\="replies" id\="replyTextarea" required\></span>{reply.replies.join('<#>')}</textarea>
 
                 <label for="priority">Priority:</label>
                 <input type="number" name="priority" id="priority" value="${reply.priority}" min="1" required />
@@ -1488,10 +1474,10 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
         const listItems = variables.map(v => `
             <div class="custom-var-card fadein">
                 <div class="var-header">
-                    <div class="var-name"><code>%${v.name}%</code></div>
-                    <div class="var-actions">
-                        <button class="edit-var-btn" onclick="window.location='/admin/edit-custom-variable/${v._id}'" title="Edit"><i class="lucide lucide-pencil"></i></button>
-                        <button class="delete-var-btn" onclick="deleteVariable('${v._id}','${v.name}')" title="Delete"><i class="lucide lucide-trash-2"></i></button>
+                    <div class="var-name"><code>%<span class="math-inline">\{v\.name\}%</code\></div\>
+<div class\="var\-actions"\>
+<button class\="edit\-var\-btn" onclick\="window\.location\='/admin/edit\-custom\-variable/</span>{v._id}'" title="Edit"><i class="lucide lucide-pencil"></i></button>
+                        <button class="delete-var-btn" onclick="deleteVariable('<span class="math-inline">\{v\.\_id\}','</span>{v.name}')" title="Delete"><i class="lucide lucide-trash-2"></i></button>
                     </div>
                 </div>
                 <div class="var-value"><code>${v.value.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></div>
@@ -1585,11 +1571,11 @@ app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => 
                 <a href="/admin/custom-variables" class="top-btn dash"><i class="lucide lucide-list"></i> All Variables</a>
                 <a href="/admin/dashboard" class="top-btn add"><i class="lucide lucide-home"></i> Dashboard</a>
             </div>
-            <form method="POST" action="/admin/edit-custom-variable/${variable._id}" class="edit-var-form fadein">
-                <h2 class="edit-head"><i class="lucide lucide-pencil"></i> Edit Custom Variable</h2>
-                <div class="field">
-                    <label for="name">Variable Name:</label>
-                    <input name="name" id="name" value="${variable.name}" readonly />
+            <form method="POST" action="/admin/edit-custom-variable/<span class="math-inline">\{variable\.\_id\}" class\="edit\-var\-form fadein"\>
+<h2 class\="edit\-head"\><i class\="lucide lucide\-pencil"\></i\> Edit Custom Variable</h2\>
+<div class\="field"\>
+<label for\="name"\>Variable Name\:</label\>
+<input name\="name" id\="name" value\="</span>{variable.name}" readonly />
                 </div>
                 <div class="field">
                     <label for="value">Variable Value:</label>
@@ -1623,12 +1609,11 @@ app.post('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) =>
 // Delete Custom Variable
 app.get('/admin/delete-custom-variable/:id', isAuthenticated, async (req, res) => {
     try {
-        await CustomVariable.findByIdAndDelete(req.params.id);
         res.redirect('/admin/custom-variables');
-    } catch (error) {
-        console.error('Error deleting custom variable:', error);
-        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error deleting custom variable.</p><br><a href="/admin/custom-variables">Back to List</a>', true));
-    }
+    } catch (error) {
+        console.error('Error deleting custom variable:', error);
+        res.status(500).set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Error deleting custom variable.</p><br><a href="/admin/custom-variables">Back to List</a>', true));
+    }
 });
 
 // ========== Import/Export Routes ==========
