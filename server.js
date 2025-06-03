@@ -1175,15 +1175,16 @@ app.post('/api/chatbot/message', async (req, res) => {
     let matchedRegexGroups = null; // To store regex groups if an expert pattern matches
 
     // Check for welcome message first - still highest priority at start of chat
-    if (!req.session.seenWelcome) {
-        req.session.seenWelcome = true;
-        try {
-            const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
-            if (welcomeReply) {
-                return res.json({ reply: await handleReplySend(welcomeReply, message, null, req.session) });
-            }
-        } catch (e) { console.error("Welcome message error:", e); }
-    }
+    // Check for welcome message first - still highest priority at start of chat
+if (!req.session.seenWelcome) {
+    req.session.seenWelcome = true;
+    try {
+        const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
+        if (welcomeReply) {
+            return res.json({ reply: await handleReplySend(welcomeReply, message, null, req.session) });
+        }
+    } catch (e) { console.error("Welcome message error:", e); }
+}
 
     // Get all rules sorted by priority for efficient lookup and master selection
     const allRules = await ChatReply.find({}).sort({ priority: 1 }); // Sorted by priority ascending
