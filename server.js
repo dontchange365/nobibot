@@ -205,11 +205,10 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
 
             .reply-area {
                 display: flex;
-                align-items: flex-start;
+                flex-direction: column; /* Changed to column for button block */
                 gap: 6px;
                 position: relative;
                 margin-bottom: 17px;
-                flex-wrap: wrap; /* Added to handle new buttons */
             }
             /* New button container style */
             .reply-area-buttons {
@@ -221,18 +220,22 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
             .reply-area textarea {
                 flex: 1;
                 margin-bottom: 0;
-                padding-right: 44px;
+                padding-right: 14px; /* Removed extra padding as icon btn is now separate */
                 width: 100%; /* Ensure it takes full width within its flex context */
             }
+            /* Old reply-icon-btn positioning when it was INSIDE textarea */
+            /* New reply-icon-btn used as a general button, not positioned absolutely inside textarea */
             .reply-icon-btn {
-                position: absolute;
-                top: 5px;
-                right: 5px;
+                /* Removed absolute positioning */
                 padding: 0;
-                height: 28px; width: 28px;
+                height: 38px; /* Made slightly larger for better click target */
+                width: auto; /* Allow width to adjust to text */
                 border-radius: 8px;
                 border: none;
                 background: rgba(155,105,255,0.09);
+                color: #7d38a8; /* Text color for these buttons */
+                font-weight: 600;
+                font-size: 0.95rem;
                 cursor: pointer;
                 display: flex;
                 align-items: center;
@@ -240,20 +243,23 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 box-shadow: 0 2px 8px #a97cfa24;
                 backdrop-filter: blur(3px);
                 transition: background 0.17s, transform 0.12s, box-shadow 0.17s;
-            }
-            .reply-icon-btn:hover {
-                background: linear-gradient(92deg, #e2d6ff 30%, #cba9f9 100%);
-                transform: scale(1.07);
-                box-shadow: 0 4px 12px #a97cfa33;
-            }
-            .reply-icon-btn:active {
-                transform: scale(0.95);
-                box-shadow: 0 1px 4px #a97cfa24;
+                padding: 0px 12px; /* Added horizontal padding for text */
             }
             .reply-icon-btn svg {
                 stroke: #7d38a8;
                 fill: none;
+                margin-right: 5px; /* Spacing for icon next to text */
             }
+            .reply-icon-btn:hover {
+                background: linear-gradient(92deg, #e2d6ff 30%, #cba9f9 100%);
+                transform: scale(1.03); /* Adjusted scale for button */
+                box-shadow: 0 4px 12px #a97cfa33;
+            }
+            .reply-icon-btn:active {
+                transform: scale(0.98); /* Adjusted scale for button */
+                box-shadow: 0 1px 4px #a97cfa24;
+            }
+
 
             .btn-main {
                 width: 100%;
@@ -366,8 +372,12 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                     left: 15px;
                 }
                 .reply-icon-btn {
-                    height: 26px; width: 26px;
-                    top: 4px; right: 4px;
+                    height: 34px; /* Adjusted size for smaller screens */
+                    padding: 0px 10px;
+                    font-size: 0.85rem;
+                }
+                .reply-icon-btn svg {
+                    width: 18px; height: 18px; /* Smaller icons on smaller screens */
                 }
                 #varPopup > div {
                     padding: 20px 18px;
@@ -447,7 +457,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 color: #8338ec;
                 filter: drop-shadow(0 1px 2px #f6f2ffb8);
             }
-            /* Reply List specific styles from previous versions, adjusted */
+            /* Reply List specific styles - Stylish gangster theme */
             .nobita-reply-panel {
                 max-width: 600px;
                 margin: 32px auto 60px auto;
@@ -455,14 +465,14 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 position: relative;
             }
             .nobita-title {
-                color: #fff; /* Revert to white for this dark background */
+                color: #fff;
                 font-family: 'Lexend', sans-serif;
                 letter-spacing: 1px;
                 margin-bottom: 0;
                 text-align: left;
                 font-weight: 700;
                 font-size: 28px;
-                text-shadow: none; /* Removed for dark background */
+                text-shadow: none;
             }
             .reply-list-header {
                 display: flex;
@@ -472,7 +482,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 padding: 0;
             }
             .add-reply-btn-top {
-                background: linear-gradient(90deg, #4f46e5 40%, #6138ca 100%); /* Adjusted for dark background */
+                background: linear-gradient(90deg, #4f46e5 40%, #6138ca 100%);
                 color: #fff;
                 padding: 8px 16px;
                 border-radius: 8px;
@@ -498,14 +508,13 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 font-size: 1.2rem;
             }
 
-            /* 3. Reply List - Stylish gangster theme */
             .reply-list {
-                padding: 20px 0; /* Adjusted padding as container has horizontal padding already */
-                min-height: 90vh; /* This should probably be on body or main container */
+                padding: 20px 0;
+                /* min-height property is generally better on the main body/container element */
             }
             .reply-card {
                 background: linear-gradient(120deg, #24183b 70%, #23123a 100%);
-                box-shadow: 0 6px 24px 0 #0009, 0 1.5px 3px #714fff40;
+                box-shadow: 0 6px 24px 0 rgba(0,0,0,0.6), 0 1.5px 3px rgba(113, 79, 255, 0.25);
                 border-radius: 18px;
                 margin-bottom: 24px;
                 padding: 18px 22px 16px 22px;
@@ -517,7 +526,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 overflow: hidden;
             }
             .reply-card:hover {
-                box-shadow: 0 10px 32px 0 #5026ff66, 0 2px 6px #a259ff3f;
+                box-shadow: 0 10px 32px 0 rgba(80, 38, 255, 0.4), 0 2px 6px rgba(162, 89, 255, 0.25);
             }
             .reply-name {
                 font-weight: 800;
@@ -539,13 +548,20 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 font-weight: 700;
                 letter-spacing: 1px;
             }
-            .reply-receive { /* Adjusted to use .receive-text class now */
+            .reply-receive {
                 font-size: 0.97rem;
                 color: #aabbec;
                 border-left: 3.5px solid #7c3aed;
                 padding-left: 10px;
                 margin-bottom: 7px;
-                /* white-space, overflow, text-overflow, max-width moved to .receive-text */
+                /* The actual truncation is handled by .receive-text class now */
+            }
+            .receive-text { /* C. Received/Keywords Truncate One Line Only - Defined here for overall styles */
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                max-width: 350px; /* Adjust as per design */
+                display: block; /* Important for ellipsis to work */
             }
             .reply-send {
                 font-size: 1rem;
@@ -555,17 +571,17 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 padding: 8px 12px;
                 margin-top: 5px;
                 word-break: break-all;
-                box-shadow: 0 2px 6px #9007;
+                box-shadow: 0 2px 6px rgba(153, 0, 119, 0.4);
             }
             .reply-actions {
                 position: absolute;
                 top: 15px; right: 17px;
                 display: flex; gap: 7px;
             }
-            .reply-actions a { /* Changed from button to a for links */
+            .reply-actions a { /* Changed from button to a for links in previous step */
                 background: none; border: none; color: #c7a7fc; font-size: 1.1rem; cursor: pointer;
                 padding: 2px 7px;
-                text-decoration: none; /* Remove underline for anchor tags */
+                text-decoration: none;
             }
             .reply-actions a:hover {
                 color: #ffe167;
@@ -598,152 +614,6 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                     padding: 0;
                 }
             }
-        </style>
-        `;
-    }
-    if (includeCustomVarStyles) {
-        styles += `
-        <style>
-            body { background: linear-gradient(120deg, #f6ecff 0%, #e7d3fa 100%); min-height:100vh; margin:0; }
-            .custom-vars-panel {
-                max-width: 680px; margin: 38px auto 0 auto; padding: 0 10px 40px 10px;
-                font-family: 'Lexend', 'Inter', sans-serif;
-            }
-            .top-bar {
-                display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
-                gap: 12px; flex-wrap: wrap;
-            }
-            .top-btn {
-                display: flex; align-items: center; gap: 7px;
-                background: linear-gradient(92deg, #a78bfa 30%, #b583f3 100%);
-                color: #fff; font-weight: 700; border: none;
-                border-radius: 14px; padding: 11px 20px; font-size: 1.03rem;
-                text-decoration: none; box-shadow: 0 3px 16px #a58ed966;
-                transition: background 0.17s, transform 0.13s, box-shadow 0.14s;
-            }
-            .top-btn.add { background: linear-gradient(90deg,#7e4af5 30%,#e75cd3 100%);}
-            .top-btn.dash { background: linear-gradient(90deg,#6c47e5 10%,#aa7dfc 90%);}
-            .top-btn:hover { background: linear-gradient(90deg,#4d1bb0,#ad3fe0 90%); transform: scale(1.045);}
-            .top-btn:active {transform:scale(0.97);}
-            .big-head {
-                font-size: 2.2rem; color: #8227b3; letter-spacing:1.4px;
-                font-weight: 800; margin-bottom: 27px; margin-top: 13px; text-align:center; text-shadow:0 2px 14px #c4a2ed37;
-            }
-            .custom-var-list {
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(310px,1fr));
-                gap: 24px; width:100%;
-            }
-            .custom-var-card {
-                background: rgba(249,243,255,0.89); border-radius: 18px;
-                box-shadow: 0 6px 24px #ceaeff37, 0 1.5px 7px #e5d4ff35;
-                padding: 23px 20px 15px 20px; min-height:90px;
-                border: 2px solid #d8b5ff44; position: relative;
-                overflow: hidden; transition: transform .22s, box-shadow .22s, border .22s, background .25s;
-                opacity: 0; transform: translateY(40px) scale(0.98);
-            }
-            .custom-var-card.show {
-                opacity:1; transform: none;
-            }
-            .custom-var-card:hover {
-                background: linear-gradient(120deg, #f9edff 30%, #f5ddff 100%);
-                box-shadow: 0 16px 40px #c68ef55e, 0 1.5px 7px #b5a2ff22;
-                border: 2.7px solid #b793ff90;
-                transform: scale(1.033) translateY(-3px) rotate(-0.5deg);
-                z-index:2;
-            }
-            .var-header {
-                display: flex; align-items: center; justify-content: space-between; margin-bottom:10px;
-            }
-            .var-name {
-                font-size: 1.35rem; color: #7e34bc; font-weight: 700;
-                background: linear-gradient(90deg, #a779fa 30%, #cd59ec 100%);
-                padding: 4px 13px; border-radius: 8px; letter-spacing:0.3px;
-                box-shadow:0 1.5px 7px #e7d6ff22;
-            }
-            .var-actions {
-                display: flex; gap:10px;
-            }
-            .edit-var-btn, .delete-var-btn {
-                background: rgba(255,255,255,0.55); border: none;
-                border-radius: 8px; box-shadow: 0 1.5px 5px #e5d2fa33;
-                padding: 5.5px 8.5px; cursor: pointer; transition: background .15s, transform .13s;
-                display: flex; align-items: center; justify-content: center;
-            }
-            .edit-var-btn:hover { background: #e2e4fb; transform: scale(1.1);}
-            .delete-var-btn:hover { background: #fff0f7; transform: scale(1.1);}
-            .edit-var-btn .lucide, .delete-var-btn .lucide { width:21px; height:21px; }
-            .delete-var-btn .lucide { color: #ff236b;}
-            .edit-var-btn .lucide { color: #825be0;}
-            .var-value {
-                font-family: 'Roboto Mono', monospace;
-                font-size: 1rem;
-                color: #272b34;
-                background: #f8f6fa;
-                border-radius: 9px;
-                padding: 7px 13px;
-                margin-bottom: 2px;
-                word-break: break-all;
-                width: 100%;
-                min-height: 32px;
-                box-sizing: border-box;
-                display: -webkit-box;
-                letter-spacing: 0.04em;
-                max-height: 44px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                -webkit-line-clamp: 2;
-                -webkit-box-orient: vertical;
-                white-space: normal;
-                transition: background .12s, max-height .22s;
-                cursor: pointer;
-                position: relative;
-            }
-            .custom-var-card:hover .var-value {
-                background: #efe1f9;
-                max-height: 250px;
-                overflow-y: auto;
-                -webkit-line-clamp: unset;
-            }
-            @media (max-width: 600px){
-                .custom-vars-panel{ max-width:98vw;}
-                .big-head { font-size:1.35rem;}
-                .custom-var-list{ grid-template-columns:1fr; gap:18px;}
-                .custom-var-card{padding:15px 10px 10px 10px;}
-                .top-btn { padding: 8px 14px; font-size: 0.95rem; }
-            }
-
-            /* Edit Custom Variable Styles */
-            .edit-var-panel { max-width:470px; margin:44px auto; font-family:'Lexend','Inter',sans-serif;}
-            .edit-var-form {
-                background:rgba(249,243,255,0.92); border-radius:18px; box-shadow:0 7px 24px #ceaeff37;
-                padding:33px 27px 18px 27px; border:2px solid #d8b5ff44; position:relative; transition:transform .22s,box-shadow .22s,border .22s,background .25s;
-                opacity:0; transform:translateY(35px) scale(0.98);
-            }
-            .edit-var-form.show{opacity:1;transform:none;}
-            .edit-head{font-size:1.45rem; font-weight:700; color:#8227b3; margin-bottom:20px; letter-spacing:0.5px; display:flex;align-items:center;gap:10px;}
-            .field{margin-bottom:17px;}
-            label{font-size:1.08rem; font-weight:600; color:#6939ba; display:block; margin-bottom:5px;}
-            input[type="text"],input[type="email"],input[type="number"],textarea {
-                width:100%; border-radius:11px; border:1.8px solid #e5dbfa; background:#faf6ff; color:#271446;
-                font-size:1.02rem; padding:11px 14px; transition:border 0.17s,box-shadow 0.18s,background 0.1s;
-                box-sizing:border-box; margin-top:6px;
-            }
-            input:focus,textarea:focus{
-                border:1.8px solid #a671f3; box-shadow:0 0 0 2.5px #e7dbffcc; background:#f5efff; outline:none;
-            }
-            textarea{min-height:70px;resize:vertical;}
-            .btn-main{
-                background:linear-gradient(90deg,#7e4af5 40%,#bf51e8 100%);
-                color:#fff; font-weight:700; font-size:1.15rem;
-                border-radius:13px; border:none; padding:12px 0; margin-top:15px; width:100%;
-                box-shadow:0 5px 16px #c79fff44; transition:box-shadow 0.17s,background 0.19s,transform 0.12s; cursor:pointer;
-                display:flex;align-items:center;justify-content:center;gap:7px;
-            }
-            .btn-main:hover{background:linear-gradient(90deg,#6124d4 40%,#8227b3 100%);box-shadow:0 9px 28px #b48ffa55;transform:translateY(-2px);}
-            .btn-main:active{transform:scale(0.98);}
-            @media (max-width:600px){.edit-var-panel{max-width:98vw;}.edit-var-form{padding:18px 7px 15px 7px;}}
-            /* Common top-bar style for edit forms */
-            .top-bar .lucide { width: 20px; height: 20px; }
         </style>
         `;
     }
@@ -886,24 +756,25 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
       // 2. Custom Variable Button/Popup Fix: Event delegation for customVarBtn
       document.body.addEventListener('click', function(e){
         // Check if the clicked element (or its parent) has the 'customVarBtn' ID
-        if(e.target.id === 'customVarBtn') {
+        // Or if it's the specific SVG/path inside it.
+        const customVarBtn = e.target.closest('#customVarBtn');
+        if(customVarBtn) {
           varPopup.style.opacity = '1';
           varPopup.style.pointerEvents = 'auto';
           showVarPopup();
         }
       });
 
-      // -------- FIXED PART: USE EVENT DELEGATION FOR REPLY ICON BUTTON --------
-      // Listen for clicks on the document body for the 'reply-icon-btn' (if still used)
-      document.body.addEventListener('click', function(e){
-        if(e.target.closest('.reply-icon-btn')) { // Use closest for robustness
-          // Now, this button should also insert into 'replyTextarea'
-          // Ensure the global 'insertVarToReply' is correctly set up for 'replyTextarea'
-          varPopup.style.opacity = '1';
-          varPopup.style.pointerEvents = 'auto';
-          showVarPopup();
-        }
-      });
+      // This is now redundant as we have a specific #customVarBtn and #uploadTxtBtn
+      // and they are outside the textarea, not icon inside it.
+      // Keeping it for robustness if you have other dynamic buttons with this class
+      // document.body.addEventListener('click', function(e){
+      //   if(e.target.closest('.reply-icon-btn')) {
+      //     varPopup.style.opacity = '1';
+      //     varPopup.style.pointerEvents = 'auto';
+      //     showVarPopup();
+      //   }
+      // });
     });
     </script>
     `;
@@ -1015,7 +886,7 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
     });
 
     // --- 3. System Variables ---
-    const now = new Date(new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })); // Assuming India as context
+    const now = new Date(new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
     replyText = replyText.replace(/%message%/g, userMessage || '');
     replyText = replyText.replace(/%message_(\d+)%/g, (match, len) => (userMessage || '').substring(0, parseInt(len)));
     if (matchedRegexGroups) {
@@ -1112,10 +983,6 @@ app.post('/api/chatbot/message', async (req, res) => {
                 }
             }
         }
-        // 7. BONUS: WELCOME MESSAGE - If it's a welcome message type, and it was not filtered out,
-        // it means it was a welcome rule, but it's not the initial conversation.
-        // We generally don't want welcome messages to interrupt active conversations unless they are also
-        // designed as pattern/exact matches. The current logic handles this by processing it first.
     }
 
     // Determine the final match based on the strict hierarchy: Expert > Pattern > Exact
@@ -1207,7 +1074,13 @@ app.get('/admin/logout', (req, res) => {
 });
 
 // -- Add Chat Reply Form
+// 1. GET TOTAL REPLIES COUNT (SERVER-SIDE)
 app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
+    // Get total number of replies
+    const totalReplies = await ChatReply.countDocuments({});
+    // Default priority is last+1
+    const defaultPriority = totalReplies + 1;
+
     let customVarsJsArray = '[]';
     try {
         const customVariables = await CustomVariable.find({});
@@ -1279,7 +1152,8 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 
 
             <label for="priority">Priority:</label>
-            <input type="number" name="priority" id="priority" value="0" />
+            <input type="number" name="priority" id="priority" value="${defaultPriority}" min="1" required />
+            <span style="font-size:12px; color:#aaa;">(Higher number = lower priority, default is last)</span>
 
             <button type="submit" class="btn-main">Add Reply</button>
         </form>
@@ -1336,7 +1210,7 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const totalRules = await ChatReply.countDocuments({});
     let newPriority = Number(priority);
 
-    // 5. DEFAULT PRIORITY ON NEW RULE + 6. VALIDATION for Add
+    // 4. BACKEND VALIDATION SAME RAKH: + 5. DEFAULT PRIORITY ON NEW RULE
     if (isNaN(newPriority) || newPriority < 1 || newPriority > totalRules + 1) {
         newPriority = totalRules + 1; // default = last available priority
     }
@@ -1484,7 +1358,8 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 <textarea name="replies" id="replyTextarea" required>${reply.replies.join('<#>')}</textarea>
 
                 <label for="priority">Priority:</label>
-                <input type="number" name="priority" id="priority" value="${reply.priority}" />
+                <input type="number" name="priority" id="priority" value="${reply.priority}" min="1" required />
+                <span style="font-size:12px; color:#aaa;">(Higher number = lower priority)</span>
 
                 <button type="submit" class="btn-main">Update Reply</button>
             </form>
