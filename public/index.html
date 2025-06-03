@@ -285,6 +285,23 @@
   </div>
 
   <script>
+  // Page Load: Check localStorage for chat history
+window.addEventListener('DOMContentLoaded', async () => {
+  let chatHistory = JSON.parse(localStorage.getItem('nobi_chat') || '[]');
+  if (chatHistory.length > 0) {
+    // Chat already exists, skip welcome, just render chats
+    chatHistory.forEach(msg => {
+      if (msg.from === 'user') appendUserMessage(msg.text);
+      else appendBotMessage(msg.text);
+    });
+    document.getElementById('name-modal').style.display = 'none';
+    document.getElementById('input-area').style.display = 'flex';
+    // Don't call API for welcome!
+    return;
+  }
+  // Agar pehli baar hai, normal flow
+  // ... baki tera code as it is
+});
     // ==== UTILS ====
     function getUrlParam(name) {
       const params = new URLSearchParams(window.location.search);
