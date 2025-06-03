@@ -1052,80 +1052,83 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-// --- Chatbot Message API Route (Defined once here) ---
+// --- Chatbot Message API Route (Updated for Pattern > Regex > Exact Flow) ---
 app.post('/api/chatbot/message', async (req, res) => {
-    const { message } = req.body; // Destructure message from req.body
-    let botReply = "Sorry, I didn't understand that.";
-    let matchedRegexGroups = null; // Initialize matchedRegexGroups to null
+    const { message } = req.body;
+    let finalMatch = null;
+    let matchedRegexGroups = null; // To store regex groups if an expert pattern matches
 
+    // Check for welcome message first
     if (!req.session.seenWelcome) {
         req.session.seenWelcome = true;
         try {
             const welcomeReply = await ChatReply.findOne({ type: 'welcome_message' });
             if (welcomeReply) {
-                return res.json({ reply: await handleReplySend(welcomeReply, message, null, req.session) }); // Use 'message' instead of 'userMessage'
+                return res.json({ reply: await handleReplySend(welcomeReply, message, null, req.session) });
             }
         } catch (e) { console.error("Welcome message error:", e); }
     }
 
-    // 1. Exact Match
-    let exactMatch = await ChatReply.findOne({ type: 'exact_match', keyword: message.trim().toLowerCase() }); // Convert message to lowercase for keyword matching
-
-    // 2. Pattern Matching
-    let patternRules = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 }); // Sorted by priority
+    // 1. PATTERN MATCHING - Find highest priority pattern match
+    let patternRules = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 }); // Sort by priority descending
     let patternMatch = null;
     let patternPriority = -99999;
     for (let rule of patternRules) {
-        const keywords = rule.keyword?.split(',').map(k => k.trim().toLowerCase()) || []; // Use rule.keyword and convert to lowercase
-        if (keywords.some(k => message.toLowerCase().includes(k))) { // Check if user message contains any keyword
-            if (rule.priority > patternPriority) {
+        const keywords = rule.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
+        if (keywords.some(k => message.toLowerCase().includes(k))) {
+            if (rule.priority > patternPriority) { // Pick highest priority
                 patternMatch = rule;
                 patternPriority = rule.priority;
             }
         }
     }
 
-    // 3. Expert Pattern Matching
-    let expertRules = await ChatReply.find({ type: 'expert_pattern_matching' }).sort({ priority: -1 }); // Sorted by priority
-    let expertMatch = null;
-    let expertPriority = -99999;
-    for (let rule of expertRules) {
-        try { // Added try-catch for regex pattern creation
-            if (rule.pattern) { // Ensure pattern exists
-                const regex = new RegExp(rule.pattern, 'i'); // Case-insensitive regex
-                const match = regex.exec(message); // Execute regex on message
-                if (match) {
-                    if (rule.priority > expertPriority) {
-                        expertMatch = rule;
-                        expertPriority = rule.priority;
-                        matchedRegexGroups = match; // Capture groups if this rule is selected
+    if (patternMatch) {
+        // 2. REGEX MATCHING ONLY IF PATTERN FOUND - Find highest priority expert regex
+        let expertRules = await ChatReply.find({ type: 'expert_pattern_matching' }).sort({ priority: -1 }); // Sort by priority descending
+        let expertMatch = null;
+        let expertPriority = -99999;
+        for (let rule of expertRules) {
+            try {
+                if (rule.pattern) {
+                    const regex = new RegExp(rule.pattern, 'i');
+                    const match = regex.exec(message);
+                    if (match) {
+                        if (rule.priority > expertPriority) { // Pick highest priority
+                            expertMatch = rule;
+                            expertPriority = rule.priority;
+                            matchedRegexGroups = match; // Capture groups from this match
+                        }
                     }
                 }
-            }
-        } catch (e) { console.error("Expert Regex pattern error:", e); } // Log regex errors
-    }
-
-    // === MASTER SELECTION ===
-    let finalMatch = null;
-    if (expertMatch) {
-        finalMatch = expertMatch; // Expert pattern wins even if exact or pattern match exists
-    } else if (patternMatch) {
-        finalMatch = patternMatch;
-    } else if (exactMatch) {
-        finalMatch = exactMatch;
-    }
-
-    if (!finalMatch) {
-        const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true }); // Find default message
-        if (fallback) {
-            return res.json({ reply: await handleReplySend(fallback, message, null, req.session) }); // Use default fallback
+            } catch (e) { console.error("Expert Regex pattern error:", e); }
         }
-        return res.json({ reply: "Sorry, I didn't understand that." }); // Default fallback if no default message is set
+
+        if (expertMatch) {
+            finalMatch = expertMatch; // Regex wins if found
+        } else {
+            finalMatch = patternMatch; // Else, the found pattern wins
+        }
+    } else {
+        // 3. EXACT MATCHING IF NO PATTERN MATCH - Find highest priority exact match
+        let exactRules = await ChatReply.find({ type: 'exact_match', keyword: message.trim().toLowerCase() }).sort({ priority: -1 }); // Sort by priority descending
+        if (exactRules && exactRules.length > 0) {
+            finalMatch = exactRules[0]; // Highest priority is the first one after sorting
+        }
     }
 
-    // Build reply (rest of your code, variable replacement, etc)
-    // The handleReplySend function already handles sendMethod logic, so no need for manual array access here
-    return res.json({ reply: await handleReplySend(finalMatch, message, matchedRegexGroups, req.session) });
+    // If a final match is found, send the reply
+    if (finalMatch) {
+        return res.json({ reply: await handleReplySend(finalMatch, message, matchedRegexGroups, req.session) });
+    }
+
+    // 4. NO MATCH (Fallback to default message if available)
+    const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
+    if (fallback) {
+        return res.json({ reply: await handleReplySend(fallback, message, null, req.session) });
+    }
+
+    return res.json({ reply: "Sorry, I didn't understand that." }); // Final fallback if no default message
 });
 
 // ========== ADMIN ROUTES ==========
@@ -1295,7 +1298,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Chat Reply', addReplyForm, true));
 });
 
-// A. Add New Rule: (Updated for priority logic)
+// A. Add New Rule: (Updated for priority logic and validation)
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>', true));
@@ -1304,7 +1307,7 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const totalRules = await ChatReply.countDocuments({});
     let newPriority = Number(priority);
 
-    // 5. New Rule By Default Last / Validation for Add
+    // 5. Default Priority on New Rule / 6. Validation for Add
     if (isNaN(newPriority) || newPriority < 1 || newPriority > totalRules + 1) {
         newPriority = totalRules + 1; // default = last
     }
@@ -1315,6 +1318,7 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         { $inc: { priority: 1 } }
     );
 
+    // Handle default message uniqueness
     if (type === 'default_message' && isDefault === 'true') {
         await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
     }
@@ -1335,7 +1339,7 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 
 // ========== Stylish /admin/reply-list Route ==========
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
-    // 3. LIST REPLY SORTING: ALWAYS sort by priority ascending
+    // 4. LISTING & LIVE SORTING: ALWAYS sort by priority ascending
     const replies = await ChatReply.find().sort({ priority: 1 }); // Sorted by priority ascending
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
@@ -1495,7 +1499,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     }
 });
 
-// B. Edit Priority: (Updated for priority logic)
+// B. Edit Priority: (Updated for priority logic and validation)
 app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
     const replyId = req.params.id;
