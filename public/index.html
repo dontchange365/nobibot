@@ -297,12 +297,19 @@
     const sendBtn = document.getElementById('send-btn');
     const typing = document.getElementById('typing');
 
+    // Chat history array and initialization
+    let chatHistory = JSON.parse(localStorage.getItem('nobi_chat') || '[]');
+
     function appendUserMessage(msg) {
       const div = document.createElement('div');
       div.className = 'msg user-msg';
       div.innerText = msg;
       chatContainer.appendChild(div);
       chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      // --- Save to chat history ---
+      chatHistory.push({ from: 'user', text: msg });
+      localStorage.setItem('nobi_chat', JSON.stringify(chatHistory));
     }
 
     function appendBotMessage(msg) {
@@ -322,7 +329,11 @@
       wrapper.appendChild(bubble);
 
       chatContainer.appendChild(wrapper);
-      chatContainer.scrollTop = chatContainer.scrollHeight;
+      chatContainer.scrollTop = chatContainer.scrollTop + chatContainer.scrollHeight; // Adjusted for correct scroll
+
+      // --- Save to chat history ---
+      chatHistory.push({ from: 'bot', text: msg });
+      localStorage.setItem('nobi_chat', JSON.stringify(chatHistory));
     }
 
     function showTyping(show = true) {
@@ -360,8 +371,17 @@
       if (e.key === 'Enter') sendMessage();
     });
 
-    // Check localStorage for name, show modal if not present
+    // Page Load Logic: Restore Chat History and Handle Name Modal
     window.addEventListener('DOMContentLoaded', () => {
+      // Restore chat history first
+      chatHistory.forEach(msg => {
+        if (msg.from === 'user') appendUserMessage(msg.text);
+        else appendBotMessage(msg.text);
+      });
+      // Ensure scroll to bottom after history is loaded
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      // Then handle name modal logic
       if (!localStorage.getItem('user_name')) {
         document.getElementById('name-modal').style.display = 'flex';
         document.getElementById('input-area').style.display = 'none';
