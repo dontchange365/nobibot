@@ -5,6 +5,7 @@
   <title>Import / Export Rules | Nobita Admin</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Lexend:wght@600;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/import-export.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.306.0/dist/lucide-static.min.css"/>
   <style>
     body { background: linear-gradient(120deg, #eceafd 70%, #e2d4f5 100%); font-family: 'Inter',sans-serif; margin: 0; min-height:100vh; }
@@ -53,32 +54,6 @@
       .import-export-header { font-size:1.37rem;}
       .back-btn { top: 10px; left: 6px; font-size:0.97rem; padding:7px 11px;}
     }
-
-    /* Message Box for Alerts */
-    #messageBox {
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: #4CAF50; /* Green for success */
-        color: white;
-        padding: 15px 25px;
-        border-radius: 8px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        z-index: 1000;
-        display: none; /* Hidden by default */
-        opacity: 0;
-        transition: opacity 0.3s ease-in-out;
-        min-width: 200px;
-        text-align: center;
-    }
-    #messageBox.error {
-        background-color: #f44336; /* Red for error */
-    }
-    #messageBox.show {
-        display: block;
-        opacity: 1;
-    }
   </style>
 </head>
 <body>
@@ -87,7 +62,7 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6"></polyline>
       </svg>
-      Back
+      Back to Dashboard
     </a>
     <div class="import-export-header">Rule Import / Export</div>
     <div class="rule-btn-row">
@@ -99,12 +74,12 @@
         <button id="importBtn_add" onclick="setImportType('add')" class="selected">Add</button>
         <button id="importBtn_overwrite" onclick="setImportType('overwrite')">Overwrite</button>
       </div>
-      <input type="file" id="ruleFileInput" accept=".csv" style="width:100%;margin-bottom:13px;" />
+      <input type="file" id="ruleFileInput" accept=".json" style="width:100%;margin-bottom:13px;" />
       <button class="rule-btn" style="width:100%;" onclick="handleImportRules()">
         <i class="lucide lucide-upload"></i> Import Rules
       </button>
       <div style="font-size:13px;color:#b86ee3;margin-top:6px;">
-        <b>Add:</b> CSV file ke saare rules jod dega <br>
+        <b>Add:</b> JSON file ke saare rules jod dega <br>
         <b>Overwrite:</b> Pehle ke rules hata ke file ke rules se replace ho jayenge
       </div>
     </div>
@@ -114,13 +89,10 @@
         <i class="lucide lucide-download"></i> Download Rules
       </button>
       <div style="font-size:13px;color:#b86ee3;margin-top:7px;">
-        Saare rules CSV file ki tarah download ho jayenge
+        Saare rules JSON file ki tarah download ho jayenge
       </div>
     </div>
   </div>
-
-  <div id="messageBox"></div>
-
   <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
   <script>lucide.createIcons();</script>
   <script src="/import-export.js"></script>
