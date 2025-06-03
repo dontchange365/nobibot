@@ -148,7 +148,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
             .top-btn { flex: 1 1 0; background: linear-gradient(90deg, #af7cf5 30%, #854ee8 100%); color: #fff; border: none; border-radius: 10px; padding: 12px 0; font-weight: 700; font-size: 1.05rem; cursor: pointer; text-align: center; box-shadow: 0 1.5px 7px #cbb0ef20; transition: background 0.15s, transform 0.14s; }
             .top-btn:hover { background: linear-gradient(90deg,#854ee8 20%,#af7cf5 100%); transform: scale(1.03);}
             
-            /* VAR ACTIONS */
+            /* VAR ACTIONS - (These styles are now largely unused as icons are removed from lists, but kept for potential future use or other similar buttons) */
             .var-actions { display: flex; gap: 7px; margin-left: auto;}
             .var-actions button { background: transparent; border: none; color: #854ee8; font-size: 1.2rem; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: background 0.12s;}
             .var-actions button:hover { background: #ede0ff; }
@@ -160,13 +160,26 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
             .back-btn { display: inline-flex; align-items: center; gap: 7px; background: #281d39; color: #fff; border: none; padding: 8px 16px; border-radius: 7px; font-weight: 700; font-size: 1rem; box-shadow: 0 1.5px 9px #a671f333; text-decoration: none; cursor: pointer; margin-bottom: 19px;}
             .back-btn:hover { background: #7c3aed; color: #fff; }
 
+            /* New Danger Button Style */
+            .btn-danger {
+                background: linear-gradient(90deg,#ed4545 40%,#e81b82 100%);
+                color: #fff; border: none; border-radius: 13px; padding: 13px 0; width:100%;
+                font-weight: 700; font-size: 1.10rem; margin-top: 13px; cursor: pointer;
+                box-shadow: 0 2px 9px #d159aa40; transition: background 0.13s, transform 0.12s;
+            }
+            .btn-danger:hover { background: linear-gradient(90deg,#e81b82 40%,#ed4545 100%); }
+
             /* General Lucide icon styling for buttons */
-            .top-btn .lucide, .back-btn .lucide, .reply-icon-btn .lucide {
+            .top-btn .lucide, .back-btn .lucide, .reply-icon-btn .lucide, .btn-main .lucide, .edit-head .lucide {
                 stroke: currentColor; /* Use button's text color */
                 fill: none;
                 stroke-width: 2.2;
-                width: 20px;
+                width: 20px; /* Default size for icons */
                 height: 20px;
+            }
+            .edit-head .lucide { /* Larger icons for heading */
+                width: 30px;
+                height: 30px;
             }
         </style>
     `;
@@ -540,10 +553,12 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 border: 1.5px solid #39355a;
                 position: relative;
                 overflow: hidden;
+                cursor: pointer; /* Made clickable */
             }
             .reply-card:hover {
                 box-shadow: 0 10px 32px 0 rgba(80, 38, 255, 0.4), 0 2px 6px rgba(162, 89, 255, 0.25);
                 transform: translateY(-3px); /* Sexy gangster look */
+                border-color: #a174fa; /* Hover effect for border */
             }
             .reply-name {
                 font-weight: 800;
@@ -596,19 +611,9 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 -webkit-line-clamp: 2;
                 -webkit-box-orient: vertical;
             }
-            .reply-actions {
-                position: absolute;
-                top: 15px; right: 17px;
-                display: flex; gap: 7px;
-            }
-            .reply-actions a { /* Changed from button to a for links in previous step */
-                background: none; border: none; color: #c7a7fc; font-size: 1.1rem; cursor: pointer;
-                padding: 2px 7px;
-                text-decoration: none;
-            }
-            .reply-actions a:hover {
-                color: #ffe167;
-            }
+            /* .reply-actions are removed from list view */
+            .reply-actions { display: none; }
+
 
             /* Responsive Adjustments for Reply List */
             @media (max-width: 700px) {
@@ -637,7 +642,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                     padding: 0;
                 }
                 .reply-list {
-                    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); /* Adjust minwidth for smaller screens */
+                    grid-template-columns: 1fr; /* Stack on phones */
                 }
             }
         </style>
@@ -689,6 +694,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 word-break: break-all;
                 opacity: 0; /* For fade-in animation */
                 transform: translateY(15px); /* For fade-in animation */
+                cursor: pointer; /* Made clickable */
             }
             .custom-var-card.show {
                 opacity: 1;
@@ -716,14 +722,11 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
-                max-width: calc(100% - 70px); /* Adjust for buttons */
+                max-width: 100%; /* No longer need to reserve space for buttons */
             }
+            /* .var-actions are removed from list view */
+            .var-actions { display: none; }
             
-            .var-actions .lucide {
-                width: 18px;
-                height: 18px;
-            }
-
             .var-value {
                 border-top: 1.4px solid #dfcefd;
                 margin-top: 7px;
@@ -775,10 +778,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 justify-content: center;
                 gap: 10px;
             }
-            .edit-head .lucide {
-                width: 30px;
-                height: 30px;
-            }
+            
             .edit-var-form .field {
                 margin-bottom: 15px;
             }
@@ -1484,15 +1484,9 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const replies = await ChatReply.find().sort({ priority: 1 }); // Sorted by priority ascending
 
     const listItems = replies.map((r, index) => `
-        <div class="reply-card">
+        <div class="reply-card" onclick="window.location='/admin/edit-reply/${r._id}'">
             <div class="reply-header">
                 <span class="reply-name"><b>${(r.ruleName || 'Untitled').toUpperCase()}</b> <span class="reply-priority">${r.priority}</span> ${getReplyIcon(r)}</span>
-                <div class="reply-actions">
-                    <a href="/admin/edit-reply/${r._id.toString()}" title="Edit"> <i class="lucide lucide-pencil"></i>
-                    </a>
-                    <a href="/admin/delete-reply/${r._id.toString()}" title="Delete" onclick="return confirm('Delete this rule?')"> <i class="lucide lucide-trash-2"></i>
-                    </a>
-                </div>
             </div>
             <div class="reply-card-divider"></div>
             <div class="reply-body">
@@ -1599,6 +1593,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 <span style="font-size:12px; color:#aaa;">(Higher number = lower priority)</span>
 
                 <button type="submit" class="btn-main">Update Reply</button>
+                <button type="button" class="btn-danger" onclick="deleteItem()">Delete</button>
             </form>
         </div>
 
@@ -1636,6 +1631,13 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             };
             reader.readAsText(file);
         };
+
+        // Delete button logic
+        function deleteItem() {
+            if(confirm('Delete this reply?')) {
+                window.location.href = '/admin/delete-reply/${reply._id}';
+            }
+        }
         </script>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm, true));
@@ -1726,13 +1728,9 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
     try {
         const variables = await CustomVariable.find({});
         const listItems = variables.map(v => `
-            <div class="custom-var-card fadein">
+            <div class="custom-var-card" onclick="window.location='/admin/edit-custom-variable/${v._id}'">
                 <div class="var-header">
                     <div class="var-name"><code>%${v.name}%</code></div>
-                    <div class="var-actions">
-                        <button class="edit-var-btn" onclick="window.location='/admin/edit-custom-variable/${v._id}'" title="Edit"><i class="lucide lucide-pencil"></i></button>
-                        <button class="delete-var-btn" onclick="deleteVariable('${v._id}','${v.name}')" title="Delete"><i class="lucide lucide-trash-2"></i></button>
-                    </div>
                 </div>
                 <div class="var-value"><code>${trimWords(v.value, 20).replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></div>
             </div>
@@ -1747,11 +1745,6 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
             <div class="custom-var-list">${listItems || '<em style="color:#6a3cc9; text-align:center; display:block;">No variables found.</em>'}</div>
         </div>
         <script>
-        function deleteVariable(id, name) {
-            if(confirm("Delete variable %" + name + "%?")) {
-                window.location = "/admin/delete-custom-variable/" + id;
-            }
-        }
         // Fade-in animation for cards
         document.addEventListener("DOMContentLoaded", ()=>{
             setTimeout(()=>{
@@ -1836,12 +1829,19 @@ app.get('/admin/edit-custom-variable/:id', isAuthenticated, async (req, res) => 
                     <textarea name="value" id="value" required>${variable.value}</textarea>
                 </div>
                 <button type="submit" class="btn-main"><i class="lucide lucide-save"></i> Update Variable</button>
+                <button type="button" class="btn-danger" onclick="deleteItem()">Delete</button>
             </form>
             </div>
             <script>
             document.addEventListener("DOMContentLoaded",()=>{
                 setTimeout(()=>{document.querySelector('.fadein').classList.add('show');},80);
             });
+            // Delete button logic
+            function deleteItem() {
+                if(confirm('Delete this variable?')) {
+                    window.location.href = '/admin/delete-custom-variable/${variable._id}';
+                }
+            }
             </script>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Custom Variable', form, false, false, true));
