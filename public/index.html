@@ -419,6 +419,21 @@
         body: JSON.stringify({ name })
       });
     }
+// Yeh script bot wali site pe daal (https://nobibot.onrender.com/ ka code)
+function getUrlParam(name) {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(name) || '';
+}
+window.addEventListener('DOMContentLoaded', () => {
+    const username = getUrlParam('username');
+    if (username) {
+        // Apne input ka selector check kar (example diya hai niche)
+        const input = document.querySelector('input[name="name"], input[placeholder*="naam"], input');
+        if (input) {
+            input.value = username;
+        }
+    }
+});
   </script>
 </body>
 </html>
