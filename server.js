@@ -1164,7 +1164,13 @@ app.get('/', (req, res) => {
 
 // --- Chatbot Message API Route (Updated for Pattern > Regex > Exact Flow) ---
 app.post('/api/chatbot/message', async (req, res) => {
-    const { message } = req.body;
+    const { message, name } = req.body; // name also extracted from body
+
+    // Session me name set kar
+    if (name && !req.session.username) {
+        req.session.username = name;
+    }
+
     let finalMatch = null;
     let matchedRegexGroups = null; // To store regex groups if an expert pattern matches
 
@@ -1246,6 +1252,18 @@ app.post('/api/chatbot/message', async (req, res) => {
     // If absolutely no match, send generic fallback
     return res.json({ reply: "Sorry, I didn't understand that." });
 });
+
+// New POST route to set user's name in session
+app.post('/api/chatbot/set-name', (req, res) => {
+    const { name } = req.body;
+    if (name) {
+        req.session.username = name;   // USER KA NAAM SESSION ME DAAL DIYA
+        // (Agar chaahe toh yahan DB me bhi save kar sakta, par session enough hai)
+        return res.json({ ok: true });
+    }
+    res.json({ ok: false });
+});
+
 
 // ========== ADMIN ROUTES ==========
 
