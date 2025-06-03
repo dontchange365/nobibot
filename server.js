@@ -85,6 +85,17 @@ function trimText(txt, wordLimit) {
     return words.length > wordLimit ? truncatedText + "..." : txt;
 }
 
+// Helper for 20-word preview
+function trimWords(str, num) {
+    if (!str) return '';
+    let words = str.split(/\s+/);
+    if (words.length > num) {
+        return words.slice(0, num).join(' ') + '...';
+    }
+    return str;
+}
+
+
 // Helper for random reply (Defined once here)
 const randomReply = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -103,11 +114,11 @@ function formatReceive(r) {
     const text = (r.type === 'exact_match' || r.type === 'pattern_matching') ? r.keyword : (r.type === 'expert_pattern_matching' ? r.pattern : (r.keyword || r.pattern || ''));
     // Ensure text is HTML-escaped before embedding in HTML
     const escapedText = text
-  .replace(/&/g, "&amp;")
-  .replace(/</g, "&lt;")
-  .replace(/>/g, "&gt;")
-  .replace(/"/g, "&quot;")
-  .replace(/'/g, "&#039;");
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
     return `<span class="receive-text">${trimText(escapedText, 5)}</span>`;
 }
 
@@ -116,12 +127,12 @@ function formatSend(r) {
     const text = (r.replies || []).join('<#>');
     // Ensure text is HTML-escaped before embedding in HTML
     const escapedText = text
-  .replace(/&/g, "&amp;")
-  .replace(/</g, "&lt;")
-  .replace(/>/g, "&gt;")
-  .replace(/"/g, "&quot;")
-  .replace(/'/g, "&#039;");
-    return escapedText;
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    return trimWords(escapedText, 20); // Apply 20-word preview here
 }
 
 
@@ -473,9 +484,9 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
             }
             /* Reply List specific styles - Stylish gangster theme */
             .nobita-reply-panel {
-                max-width: 600px;
+                max-width: 680px; /* Adjusted for wider cards */
                 margin: 32px auto 60px auto;
-                padding: 0 6px;
+                padding: 0 10px;
                 position: relative;
             }
             .nobita-title {
@@ -524,23 +535,26 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
 
             .reply-list {
                 padding: 20px 0;
-                /* min-height property is generally better on the main body/container element */
+                display: grid; /* Added for grid layout */
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Responsive columns */
+                gap: 22px; /* Gap between cards */
             }
             .reply-card {
                 background: linear-gradient(120deg, #24183b 70%, #23123a 100%);
                 box-shadow: 0 6px 24px 0 rgba(0,0,0,0.6), 0 1.5px 3px rgba(113, 79, 255, 0.25);
                 border-radius: 18px;
-                margin-bottom: 24px;
+                /* margin-bottom: 24px; Removed as grid handles spacing */
                 padding: 18px 22px 16px 22px;
                 color: #f8e9ff;
                 font-family: 'Lexend', 'Inter', 'Segoe UI', sans-serif;
-                transition: box-shadow 0.25s;
+                transition: box-shadow 0.25s, transform 0.15s; /* Added transform for hover effect */
                 border: 1.5px solid #39355a;
                 position: relative;
                 overflow: hidden;
             }
             .reply-card:hover {
                 box-shadow: 0 10px 32px 0 rgba(80, 38, 255, 0.4), 0 2px 6px rgba(162, 89, 255, 0.25);
+                transform: translateY(-3px); /* Sexy gangster look */
             }
             .reply-name {
                 font-weight: 800;
@@ -586,6 +600,12 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 margin-top: 5px;
                 word-break: break-all;
                 box-shadow: 0 2px 6px rgba(153, 0, 119, 0.4);
+                max-height: 48px; /* For 20-word preview, approx 2 lines */
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
             }
             .reply-actions {
                 position: absolute;
@@ -627,6 +647,288 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                     align-items: flex-start;
                     padding: 0;
                 }
+                .reply-list {
+                    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); /* Adjust minwidth for smaller screens */
+                }
+            }
+        </style>
+        `;
+    }
+    if (includeCustomVarStyles) {
+        styles += `
+        <style>
+            body {
+                background: linear-gradient(120deg, #F3E6FF 0%, #D3D1FF 100%);
+                font-family: 'Lexend', 'Inter', sans-serif;
+                margin: 0;
+                padding: 0;
+                min-height: 100vh;
+            }
+            .custom-vars-panel {
+                max-width: 680px;
+                margin: 38px auto 0 auto;
+                padding: 0 10px 40px 10px;
+            }
+            .top-bar {
+                display: flex;
+                justify-content: flex-start; /* Aligned to start */
+                gap: 15px; /* Spacing between buttons */
+                margin-bottom: 30px;
+            }
+            .top-btn {
+                background: linear-gradient(90deg, #7e4af5 40%, #bf51e8 100%);
+                color: #fff;
+                border: none;
+                border-radius: 9px;
+                padding: 10px 18px;
+                font-size: 0.98rem;
+                font-weight: 600;
+                cursor: pointer;
+                box-shadow: 0 2px 9px #ab7fee40;
+                transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+                display: flex;
+                align-items: center;
+                gap: 7px;
+                text-decoration: none; /* For links */
+            }
+            .top-btn:hover {
+                background: linear-gradient(90deg, #6124d4 40%, #8227b3 100%);
+                transform: translateY(-2px);
+                box-shadow: 0 4px 14px #ab7fee60;
+            }
+            .top-btn:active {
+                transform: translateY(0);
+                box-shadow: 0 1px 5px #ab7fee40;
+            }
+            .top-btn .lucide {
+                width: 18px;
+                height: 18px;
+            }
+
+            .big-head {
+                font-size: 2.1rem;
+                color: #7023d8;
+                letter-spacing: 0.7px;
+                margin-bottom: 24px;
+                text-align: left;
+                font-weight: 800;
+            }
+
+            /* Custom Variable Card/Box CSS */
+            .custom-var-list {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                gap: 22px;
+                margin-top: 20px;
+            }
+            .custom-var-card {
+                background: linear-gradient(120deg,#f9f4ff 65%,#eee6fc 100%);
+                border-radius: 19px;
+                box-shadow: 0 4px 20px #c3a0ff1b;
+                padding: 22px 20px 16px 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                min-height: 95px;
+                border: 1.7px solid #e3d0ff;
+                transition: box-shadow 0.18s, border 0.15s, transform 0.15s; /* Added transform */
+                word-break: break-all;
+                opacity: 0; /* For fade-in animation */
+                transform: translateY(15px); /* For fade-in animation */
+            }
+            .custom-var-card.show {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            .custom-var-card:hover {
+                box-shadow: 0 12px 34px #d4c8fd55;
+                border-color: #b48ffa;
+                transform: translateY(-3px); /* Sexy hover effect */
+            }
+            .var-header {
+                width: 100%;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 6px;
+            }
+            .var-name {
+                font-size: 1.09rem;
+                color: #7023d8;
+                font-weight: 700;
+                background: #ede0ff;
+                border-radius: 6px;
+                padding: 2px 11px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: calc(100% - 70px); /* Adjust for buttons */
+            }
+            .var-actions {
+                display: flex;
+                gap: 8px;
+            }
+            .var-actions button {
+                background: none;
+                border: none;
+                color: #7d38a8;
+                cursor: pointer;
+                padding: 5px;
+                border-radius: 5px;
+                transition: background 0.15s, color 0.15s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .var-actions button:hover {
+                background: #e2d6ff;
+                color: #4a1d82;
+            }
+            .var-actions .lucide {
+                width: 18px;
+                height: 18px;
+            }
+
+            .var-value {
+                border-top: 1.4px solid #dfcefd;
+                margin-top: 7px;
+                padding-top: 7px;
+                color: #5e458b;
+                font-size: 0.98rem;
+                width: 100%;
+                min-height: 18px;
+                max-height: 37px; /* Enough for 2 lines */
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: -webkit-box;
+                -webkit-line-clamp: 2; /* Only 2 lines shown for preview */
+                -webkit-box-orient: vertical;
+            }
+
+            /* Edit/Add Variable Form Styling */
+            .edit-var-panel {
+                max-width: 500px;
+                margin: 38px auto 0 auto;
+                padding: 0 10px 40px 10px;
+                font-family: 'Inter', sans-serif;
+            }
+            .edit-var-form {
+                background: #fff;
+                border-radius: 22px;
+                box-shadow: 0 8px 30px #a37be755;
+                padding: 32px 20px 26px 20px;
+                position: relative;
+                box-sizing: border-box;
+                opacity: 0;
+                transform: translateY(45px) scale(0.98);
+                transition: opacity 0.7s cubic-bezier(.18,1.13,.4,1.06), transform 0.7s cubic-bezier(.18,1.13,.4,1.06);
+            }
+            .edit-var-form.show {
+                opacity: 1;
+                transform: none;
+            }
+            .edit-head {
+                font-size: 2.1rem;
+                color: #8227b3;
+                font-weight: 800;
+                letter-spacing: 1.5px;
+                margin-bottom: 18px;
+                text-shadow: 0 2px 14px #e3d2ff7c;
+                text-align: center;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+            }
+            .edit-head .lucide {
+                width: 30px;
+                height: 30px;
+            }
+            .edit-var-form .field {
+                margin-bottom: 15px;
+            }
+            .edit-var-form label {
+                display: block;
+                color: #6a3cc9;
+                font-weight: 600;
+                font-size: 1.06rem;
+                margin-bottom: 4px;
+            }
+            .edit-var-form input[type="text"],
+            .edit-var-form textarea {
+                width: 100%;
+                border-radius: 10px;
+                border: 1.7px solid #e5dbfa;
+                background: #faf6ff;
+                color: #271446;
+                font-size: 1rem;
+                padding: 11px 14px;
+                transition: border 0.17s, box-shadow 0.18s, background 0.1s;
+                box-sizing: border-box;
+            }
+            .edit-var-form input[type="text"]:focus,
+            .edit-var-form textarea:focus {
+                border: 1.7px solid #a671f3;
+                box-shadow: 0 0 0 2.5px #e7dbffcc;
+                background: #f5efff;
+                outline: none;
+            }
+            .edit-var-form textarea {
+                min-height: 80px;
+                resize: vertical;
+            }
+
+            /* Responsive for custom variables */
+            @media (max-width: 500px) {
+                .custom-vars-panel {
+                    margin: 20px auto;
+                    padding: 0 8px 30px 8px;
+                }
+                .top-bar {
+                    flex-direction: column;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                }
+                .top-btn {
+                    width: 100%;
+                    justify-content: center;
+                    font-size: 0.9rem;
+                    padding: 9px 15px;
+                }
+                .big-head {
+                    font-size: 1.8rem;
+                    text-align: center;
+                }
+                .custom-var-list {
+                    grid-template-columns: 1fr; /* Stack on phones */
+                    gap: 15px;
+                }
+                .custom-var-card {
+                    padding: 18px 16px 14px 16px;
+                }
+                .var-name {
+                    font-size: 1rem;
+                }
+                .var-value {
+                    font-size: 0.9rem;
+                }
+                .edit-var-panel {
+                    margin: 20px auto;
+                    padding: 0 8px 30px 8px;
+                }
+                .edit-var-form {
+                    padding: 25px 15px 20px 15px;
+                }
+                .edit-head {
+                    font-size: 1.8rem;
+                }
+                .edit-var-form label {
+                    font-size: 1rem;
+                }
+                .edit-var-form input, .edit-var-form textarea {
+                    font-size: 0.95rem;
+                    padding: 9px 12px;
+                }
             }
         </style>
         `;
@@ -634,16 +936,18 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
     if (includeImportExportStyles) {
         styles += `
         <style>
-            .admin-container { max-width: 500px; margin: 40px auto; font-family: 'Lexend',sans-serif;}
-            .rule-btn {
+            .admin-container { max-width: 500px; margin: 40px auto; font-family: 'Lexend',sans-serif; padding: 0 10px;}
+            .styled-btn {
                 background: linear-gradient(90deg,#7e4af5 40%,#bf51e8 100%);
                 color: #fff; border: none; border-radius: 13px; padding: 13px 28px;
                 font-size: 1.18rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 9px #ab7fee40;
                 margin-bottom: 7px; transition: background 0.15s,transform 0.1s;
                 display: inline-block;
-                margin-right: 15px;
+                margin-right: 15px; /* Added spacing */
             }
-            .rule-btn:hover { background: linear-gradient(90deg,#6124d4 40%,#8227b3 100%); transform: translateY(-2px);}
+            .styled-btn:hover { background: linear-gradient(90deg,#6124d4 40%,#8227b3 100%); transform: translateY(-2px);}
+            .styled-btn:active { transform: translateY(0); box-shadow: 0 1px 4px #ab7fee40;}
+
             .admin-container h1 { font-size: 2.1rem; color: #7023d8; letter-spacing: 0.7px; margin-bottom: 24px; text-align: left; font-weight: 800; }
             .admin-container h2 { font-size: 1.6rem; color: #8227b3; margin-top: 25px; margin-bottom: 15px; }
             input[type="file"] { margin-bottom: 13px; display: block; width: 100%; box-sizing: border-box; }
@@ -663,9 +967,10 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 .admin-container { margin: 20px auto; padding: 0 10px; }
                 .admin-container h1 { font-size: 1.6rem; }
                 .admin-container h2 { font-size: 1.3rem; }
-                .rule-btn { padding: 10px 20px; font-size: 1rem; margin-right: 10px;}
+                .styled-btn { padding: 10px 20px; font-size: 1rem; margin-right: 10px;}
                 input[type="file"], input[type="text"] { font-size: 0.9rem; padding: 8px 12px; }
                 label { font-size: 0.95rem; }
+                .admin-container > div { flex-direction: column; gap: 15px;} /* Stack buttons on small screens */
             }
         </style>
         `;
@@ -714,31 +1019,30 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
         allVars
           .filter(v => v.toLowerCase().includes(filter.toLowerCase()))
           .forEach(v => {
-            // Ye loop ke andar hona chahiye, example:
-// allVars.forEach(function(v) {
-  const li = document.createElement('li');
-  li.textContent = v;
-  li.style.cssText = "padding:8px 12px; cursor:pointer; border-radius:6px; font-size:16px; color:#7d38a8;";
-  li.onmouseover = () => li.style.background = "#f3eaff";
-  li.onmouseout = () => li.style.background = "";
-  li.onclick = () => insertVarToReply(v);
-  varList.appendChild(li);
-// });
+            const li = document.createElement('li');
+            li.textContent = v;
+            li.style.cssText = "padding:8px 12px; cursor:pointer; border-radius:6px; font-size:16px; color:#7d38a8;";
+            li.onmouseover = () => li.style.background = "#f3eaff";
+            li.onmouseout = () => li.style.background = "";
+            li.onclick = () => insertVarToReply(v);
+            varList.appendChild(li);
+        });
+      }
 
-function insertVarToReply(variable) {
-  // Find the currently focused textarea with id 'replyTextarea'
-  const textarea = document.getElementById('replyTextarea');
-  if (textarea) {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const value = textarea.value;
-    textarea.value = value.substring(0, start) + variable + value.substring(end);
-    textarea.selectionStart = textarea.selectionEnd = start + variable.length;
-    textarea.focus();
-  }
-  varPopup.style.opacity = '0';
-  varPopup.style.pointerEvents = 'none';
-}
+      function insertVarToReply(variable) {
+          // Find the currently focused textarea with id 'replyTextarea'
+          const textarea = document.getElementById('replyTextarea');
+          if (textarea) {
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const value = textarea.value;
+            textarea.value = value.substring(0, start) + variable + value.substring(end);
+            textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+            textarea.focus();
+          }
+          varPopup.style.opacity = '0';
+          varPopup.style.pointerEvents = 'none';
+      }
 
       // Event Listeners for popup (defined once)
       varSearchInput.oninput = function() {
@@ -1247,13 +1551,14 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
-                <span class="reply-name"><b>${(r.ruleName || 'Untitled').toUpperCase()}</b> <span class="reply-priority">${r.priority}</span> ${getReplyIcon(r)}
-</div>
-<div class="reply-body">
-<div class="reply-receive">${formatReceive(r)}</div> <div class="reply-send">${formatSend(r)}</div>
-</div>
-<div class="reply-actions">
-<a href="/admin/edit-reply/${r._id.toString()}" title="Edit"> <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
+                <span class="reply-name"><b>${(r.ruleName || 'Untitled').toUpperCase()}</b> <span class="reply-priority">${r.priority}</span> ${getReplyIcon(r)}</span>
+            </div>
+            <div class="reply-body">
+                <div class="reply-receive">${formatReceive(r)}</div>
+                <div class="reply-send">${formatSend(r)}</div>
+            </div>
+            <div class="reply-actions">
+                <a href="/admin/edit-reply/${r._id.toString()}" title="Edit"> <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
                 </a>
                 <a href="/admin/delete-reply/${r._id.toString()}" title="Delete" onclick="return confirm('Delete this rule?')"> <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg>
                 </a>
@@ -1486,12 +1791,12 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
             <div class="custom-var-card fadein">
                 <div class="var-header">
                     <div class="var-name"><code>%${v.name}%</code></div>
-<div class="var-actions">
-<button class="edit-var-btn" onclick="window.location='/admin/edit-custom-variable/${v._id}'" title="Edit"><i class="lucide lucide-pencil"></i></button>
+                    <div class="var-actions">
+                        <button class="edit-var-btn" onclick="window.location='/admin/edit-custom-variable/${v._id}'" title="Edit"><i class="lucide lucide-pencil"></i></button>
                         <button class="delete-var-btn" onclick="deleteVariable('${v._id}','${v.name}')" title="Delete"><i class="lucide lucide-trash-2"></i></button>
                     </div>
                 </div>
-                <div class="var-value"><code>${v.value.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></div>
+                <div class="var-value"><code>${trimWords(v.value, 20).replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></div>
             </div>
         `).join('');
         const content = `
@@ -1639,9 +1944,9 @@ app.get('/admin/import-export-rules', isAuthenticated, (req, res) => {
             Back to Dashboard
         </a>
         <h1>Import / Export Rules</h1>
-        <div style="display:flex;gap:22px;">
-            <button class="rule-btn" onclick="showImport()">📥 Import</button>
-            <button class="rule-btn" onclick="showExport()">📤 Export</button>
+        <div style="display:flex;gap:22px;flex-wrap:wrap;">
+            <button class="styled-btn" onclick="showImport()">📥 Import</button>
+            <button class="styled-btn" onclick="showExport()">📤 Export</button>
         </div>
         <div id="importSection" style="display:none;margin-top:30px;">
             <h2>Import Rules (.csv)</h2>
@@ -1651,14 +1956,14 @@ app.get('/admin/import-export-rules', isAuthenticated, (req, res) => {
                     <label><input type="radio" name="importMode" value="add" checked> Add</label>
                     <label><input type="radio" name="importMode" value="overwrite"> Overwrite</label>
                 </div>
-                <button class="rule-btn" type="submit">Upload & Import</button>
+                <button class="styled-btn" type="submit">Upload & Import</button>
             </form>
         </div>
         <div id="exportSection" style="display:none;margin-top:30px;">
             <h2>Export Rules (.csv)</h2>
             <form id="exportForm" action="/admin/export-rules" method="POST">
                 <input type="text" name="filename" placeholder="File Name" required value="nobita_rules">
-                <button class="rule-btn" type="submit">Download</button>
+                <button class="styled-btn" type="submit">Download</button>
             </form>
         </div>
     </div>
@@ -1767,5 +2072,5 @@ app.post('/admin/export-rules', isAuthenticated, async (req, res) => {
 
 // ========== SERVER START ==========
 app.listen(PORT, () => {
-    console.log(`Nobita's Server running on port ${PORT}`);
+    console.log(`NobiBot Server running on port ${PORT}`);
 });
