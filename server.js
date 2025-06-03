@@ -101,13 +101,17 @@ function getReplyIcon(r) {
 // Helper for formatting receive field in reply list (Defined once here)
 function formatReceive(r) {
     const text = (r.type === 'exact_match' || r.type === 'pattern_matching') ? r.keyword : (r.type === 'expert_pattern_matching' ? r.pattern : (r.keyword || r.pattern || ''));
-    return `<span class="receive-text">${trimText(text, 5)}</span>`; // Adjusted word limit for better single-line display
+    // Ensure text is HTML-escaped before embedding in HTML
+    const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;');
+    return `<span class="receive-text">${trimText(escapedText, 5)}</span>`;
 }
 
 // Helper for formatting send field in reply list (Defined once here)
 function formatSend(r) {
     const text = (r.replies || []).join('<#>');
-    return trimText(text, 20);
+    // Ensure text is HTML-escaped before embedding in HTML
+    const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;');
+    return escapedText;
 }
 
 
@@ -700,32 +704,31 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
         allVars
           .filter(v => v.toLowerCase().includes(filter.toLowerCase()))
           .forEach(v => {
-            const li = document.createElement('li');
-            li.textContent = v;
-            li.style.cssText = "padding:8px 12px; cursor:pointer; border-radius:6px; font-size:16px; color:#7d38a8;";
-            li.onmouseover = () => li.style.background = "#f3eaff";
-            li.onmouseout = () => li.style.background = "";
-            li.onclick = () => insertVarToReply(v);
-            varList.appendChild(li);
-          });
-      }
+            // Ye loop ke andar hona chahiye, example:
+// allVars.forEach(function(v) {
+  const li = document.createElement('li');
+  li.textContent = v;
+  li.style.cssText = "padding:8px 12px; cursor:pointer; border-radius:6px; font-size:16px; color:#7d38a8;";
+  li.onmouseover = () => li.style.background = "#f3eaff";
+  li.onmouseout = () => li.style.background = "";
+  li.onclick = () => insertVarToReply(v);
+  varList.appendChild(li);
+// });
 
-      function insertVarToReply(variable) {
-        // Find the currently focused textarea with id 'replies'
-        // This is important for delegation, to know which textarea to insert into
-        // Changed to use the ID `replyTextarea` which is the actual textarea now
-        const textarea = document.getElementById('replyTextarea');
-        if (textarea) { // Ensure textarea exists
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const value = textarea.value;
-            textarea.value = value.substring(0, start) + variable + value.substring(end);
-            textarea.selectionStart = textarea.selectionEnd = start + variable.length;
-            textarea.focus();
-        }
-        varPopup.style.opacity = '0';
-        varPopup.style.pointerEvents = 'none';
-      }
+function insertVarToReply(variable) {
+  // Find the currently focused textarea with id 'replyTextarea'
+  const textarea = document.getElementById('replyTextarea');
+  if (textarea) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const value = textarea.value;
+    textarea.value = value.substring(0, start) + variable + value.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+    textarea.focus();
+  }
+  varPopup.style.opacity = '0';
+  varPopup.style.pointerEvents = 'none';
+}
 
       // Event Listeners for popup (defined once)
       varSearchInput.oninput = function() {
@@ -753,10 +756,8 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
           }
       });
 
-      // 2. Custom Variable Button/Popup Fix: Event delegation for customVarBtn
+      // Event delegation for customVarBtn (now using its ID)
       document.body.addEventListener('click', function(e){
-        // Check if the clicked element (or its parent) has the 'customVarBtn' ID
-        // Or if it's the specific SVG/path inside it.
         const customVarBtn = e.target.closest('#customVarBtn');
         if(customVarBtn) {
           varPopup.style.opacity = '1';
@@ -764,17 +765,6 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
           showVarPopup();
         }
       });
-
-      // This is now redundant as we have a specific #customVarBtn and #uploadTxtBtn
-      // and they are outside the textarea, not icon inside it.
-      // Keeping it for robustness if you have other dynamic buttons with this class
-      // document.body.addEventListener('click', function(e){
-      //   if(e.target.closest('.reply-icon-btn')) {
-      //     varPopup.style.opacity = '1';
-      //     varPopup.style.pointerEvents = 'auto';
-      //     showVarPopup();
-      //   }
-      // });
     });
     </script>
     `;
@@ -1205,8 +1195,7 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     const { ruleName, type, keyword, pattern, replies, priority, sendMethod } = req.body;
     if (!replies) return res.status(400).send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>', true));
 
-    // Calculate total rules for validation and default priority (excluding welcome messages for count if needed, but here count all)
-    // For priority management, it's safer to count all existing rules.
+    // Calculate total rules for validation and default priority
     const totalRules = await ChatReply.countDocuments({});
     let newPriority = Number(priority);
 
@@ -1221,7 +1210,6 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
     }
 
     // Shift rules below this priority down
-    // This is crucial: only shift if the new rule is inserted somewhere in between
     await ChatReply.updateMany(
         { priority: { $gte: newPriority } },
         { $inc: { priority: 1 } }
@@ -1249,17 +1237,15 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
-                <span class="reply-name"><b>${(r.ruleName || 'Untitled').toUpperCase()}</b> <span class="reply-priority">${r.priority}</span> ${getReplyIcon(r)}</span>
-            </div>
-            <div class="reply-body">
-                <div class="reply-receive">${formatReceive(r)}</div> <div class="reply-send">${formatSend(r)}</div>
-            </div>
-            <div class="reply-actions">
-                <a href="/admin/edit-reply/${r._id}" title="Edit">
-                  <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
+                <span class="reply-name"><b>${(r.ruleName || 'Untitled').toUpperCase()}</b> <span class="reply-priority">${r.priority}</span> ${getReplyIcon(r)}
+</div>
+<div class="reply-body">
+<div class="reply-receive">${formatReceive(r)}</div> <div class="reply-send">${formatSend(r)}</div>
+</div>
+<div class="reply-actions">
+<a href="/admin/edit-reply/${r._id.toString()}" title="Edit"> <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
                 </a>
-                <a href="/admin/delete-reply/${r._id}" title="Delete" onclick="return confirm('Delete this rule?')">
-                  <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg>
+                <a href="/admin/delete-reply/${r._id.toString()}" title="Delete" onclick="return confirm('Delete this rule?')"> <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg>
                 </a>
             </div>
         </div>
@@ -1326,7 +1312,6 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                       <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
                   </select>
                 </div>
-
                 <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching' || reply.type === 'welcome_message') ? 'display:block;' : 'display:none;'}">
                     <label for="keyword">Keyword(s):</label>
                     <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
@@ -1335,7 +1320,6 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                     <label for="pattern">Regex Pattern:</label>
                     <input name="pattern" id="pattern" value="${reply.pattern || ''}" placeholder="Only for Expert Regex. Use () for capturing groups." />
                 </div>
-
                 <label for="replies">Replies (use &lt;#&gt; between lines):</label>
                 <div class="reply-area-buttons">
                     <button type="button" id="customVarBtn" class="reply-icon-btn" title="Insert Variable">
@@ -1492,8 +1476,8 @@ app.get('/admin/custom-variables', isAuthenticated, async (req, res) => {
             <div class="custom-var-card fadein">
                 <div class="var-header">
                     <div class="var-name"><code>%${v.name}%</code></div>
-                    <div class="var-actions">
-                        <button class="edit-var-btn" onclick="window.location='/admin/edit-custom-variable/${v._id}'" title="Edit"><i class="lucide lucide-pencil"></i></button>
+<div class="var-actions">
+<button class="edit-var-btn" onclick="window.location='/admin/edit-custom-variable/${v._id}'" title="Edit"><i class="lucide lucide-pencil"></i></button>
                         <button class="delete-var-btn" onclick="deleteVariable('${v._id}','${v.name}')" title="Delete"><i class="lucide lucide-trash-2"></i></button>
                     </div>
                 </div>
