@@ -419,21 +419,22 @@
         body: JSON.stringify({ name })
       });
     }
-// Yeh script bot wali site pe daal (https://nobibot.onrender.com/ ka code)
+
+// ===== AUTO-FILL USERNAME FROM URL =====
 function getUrlParam(name) {
     const params = new URLSearchParams(window.location.search);
     return params.get(name) || '';
 }
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', function () {
     const username = getUrlParam('username');
     if (username) {
-        // Apne input ka selector check kar (example diya hai niche)
-        const input = document.querySelector('input[name="name"], input[placeholder*="naam"], input');
-        if (input) {
-            input.value = username;
+        const nameInput = document.getElementById('userNameInput');
+        if (nameInput) {
+            nameInput.value = username;
         }
     }
 });
+
   </script>
 </body>
 </html>
