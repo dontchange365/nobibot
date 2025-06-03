@@ -48,7 +48,7 @@ const ChatReplySchema = new mongoose.Schema({
     pattern: String,
     replies: [String],
     priority: { type: Number, default: 0 },
-    isDefault: { type: Boolean, default: false },
+    // 1. DEFAULT REPLY SYSTEM (REMOVE) - isDefault field removed
     sendMethod: { type: String, enum: ['random', 'all', 'once'], default: 'random' }
 });
 const ChatReply = mongoose.model('ChatReply', ChatReplySchema);
@@ -96,14 +96,15 @@ function getReplyIcon(r) {
     if (r.type === 'pattern_matching') return "🧩";
     if (r.type === 'expert_pattern_matching') return "🧠";
     if (r.type === 'welcome_message') return "👋";
-    if (r.type === 'default_message') return "💬";
+    // 1. DEFAULT REPLY SYSTEM (REMOVE) - No specific icon for default_message type, as it's being replaced.
     return "";
 }
 
 // Helper for formatting receive field in reply list (Defined once here)
 function formatReceive(r) {
+    // C. Received/Keywords Truncate One Line Only
     const text = (r.type === 'exact_match' || r.type === 'pattern_matching') ? r.keyword : (r.type === 'expert_pattern_matching' ? r.pattern : (r.keyword || r.pattern || ''));
-    return trimText(text, 4);
+    return `<span class="receive-text">${trimText(text, 5)}</span>`; // Adjusted word limit for better single-line display
 }
 
 // Helper for formatting send field in reply list (Defined once here)
@@ -537,12 +538,12 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
             }
             .reply-label.send { color: #ff6f61; }
             .reply-label.receive { color: #46e579; }
-            .reply-receive, .reply-send {
-                color: #fff;
-                font-family: 'Roboto Mono', monospace;
-                font-size: 15px;
-                white-space: pre-line;
-                word-break: break-all;
+            .receive-text { /* C. Received/Keywords Truncate One Line Only */
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                max-width: 220px; /* adjust as per design */
+                display: block;
             }
             hr {
                 border: 0;
@@ -1058,7 +1059,8 @@ app.post('/api/chatbot/message', async (req, res) => {
     let finalMatch = null;
     let matchedRegexGroups = null; // To store regex groups if an expert pattern matches
 
-    // Check for welcome message first
+    // 7. BONUS: WELCOME MESSAGE
+    // Check for welcome message first - still highest priority at start of chat
     if (!req.session.seenWelcome) {
         req.session.seenWelcome = true;
         try {
@@ -1069,66 +1071,78 @@ app.post('/api/chatbot/message', async (req, res) => {
         } catch (e) { console.error("Welcome message error:", e); }
     }
 
-    // 1. PATTERN MATCHING - Find highest priority pattern match
-    let patternRules = await ChatReply.find({ type: 'pattern_matching' }).sort({ priority: -1 }); // Sort by priority descending
-    let patternMatch = null;
-    let patternPriority = -99999;
-    for (let rule of patternRules) {
-        const keywords = rule.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
-        if (keywords.some(k => message.toLowerCase().includes(k))) {
-            if (rule.priority > patternPriority) { // Pick highest priority
-                patternMatch = rule;
-                patternPriority = rule.priority;
-            }
-        }
-    }
+    // Get all rules sorted by priority for efficient lookup and master selection
+    const allRules = await ChatReply.find({}).sort({ priority: 1 }); // Sorted by priority ascending
 
-    if (patternMatch) {
-        // 2. REGEX MATCHING ONLY IF PATTERN FOUND - Find highest priority expert regex
-        let expertRules = await ChatReply.find({ type: 'expert_pattern_matching' }).sort({ priority: -1 }); // Sort by priority descending
-        let expertMatch = null;
-        let expertPriority = -99999;
-        for (let rule of expertRules) {
+    // 5. CATCH-ALL RULE (EXACT MATCH * ONLY LAST PE TRIGGER HO)
+    // Find the catch-all rule if it exists, but don't consider it for primary matching yet
+    const catchAllRule = allRules.find(rule => rule.type === "exact_match" && rule.keyword === '*');
+    const nonCatchAllRules = allRules.filter(rule => !(rule.type === "exact_match" && rule.keyword === '*'));
+
+    // 1. EXPERT PATTERN ALWAYS WINS LOGIC (REFINED)
+    // Iterate through rules in order of precedence: Pattern -> Expert Regex -> Exact (non-catch-all)
+    let foundPatternMatch = null;
+    let foundExpertMatch = null;
+    let foundExactMatch = null;
+
+    // First pass: Find the highest priority match for each type (excluding catch-all)
+    for (const rule of nonCatchAllRules) {
+        if (rule.type === 'pattern_matching') {
+            const keywords = rule.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
+            if (keywords.some(k => message.toLowerCase().includes(k))) {
+                // If this rule has higher priority than current patternMatch, update
+                if (!foundPatternMatch || rule.priority < foundPatternMatch.priority) { // Lower priority number means higher priority
+                    foundPatternMatch = rule;
+                }
+            }
+        } else if (rule.type === 'expert_pattern_matching') {
             try {
                 if (rule.pattern) {
                     const regex = new RegExp(rule.pattern, 'i');
                     const match = regex.exec(message);
                     if (match) {
-                        if (rule.priority > expertPriority) { // Pick highest priority
-                            expertMatch = rule;
-                            expertPriority = rule.priority;
-                            matchedRegexGroups = match; // Capture groups from this match
+                        // If this rule has higher priority than current expertMatch, update
+                        if (!foundExpertMatch || rule.priority < foundExpertMatch.priority) {
+                            foundExpertMatch = rule;
+                            matchedRegexGroups = match; // Capture groups for the best expert match
                         }
                     }
                 }
-            } catch (e) { console.error("Expert Regex pattern error:", e); }
-        }
-
-        if (expertMatch) {
-            finalMatch = expertMatch; // Regex wins if found
-        } else {
-            finalMatch = patternMatch; // Else, the found pattern wins
-        }
-    } else {
-        // 3. EXACT MATCHING IF NO PATTERN MATCH - Find highest priority exact match
-        let exactRules = await ChatReply.find({ type: 'exact_match', keyword: message.trim().toLowerCase() }).sort({ priority: -1 }); // Sort by priority descending
-        if (exactRules && exactRules.length > 0) {
-            finalMatch = exactRules[0]; // Highest priority is the first one after sorting
+            } catch (e) { console.error("Expert Regex pattern error for rule:", rule.ruleName, e); }
+        } else if (rule.type === 'exact_match' && rule.keyword !== '*') {
+            if (rule.keyword === message.trim().toLowerCase()) {
+                // If this rule has higher priority than current exactMatch, update
+                if (!foundExactMatch || rule.priority < foundExactMatch.priority) {
+                    foundExactMatch = rule;
+                }
+            }
+        } else if (rule.type === 'welcome_message') {
+            // Welcome message already handled at the very beginning of the route
+            // No need to process here if req.session.seenWelcome is true.
         }
     }
 
-    // If a final match is found, send the reply
+    // Determine the final match based on the hierarchy: Expert > Pattern > Exact
+    if (foundExpertMatch) { // Expert Pattern wins if found
+        finalMatch = foundExpertMatch;
+    } else if (foundPatternMatch) { // Otherwise, Pattern Matching wins if found
+        finalMatch = foundPatternMatch;
+    } else if (foundExactMatch) { // Otherwise, Exact Match wins if found
+        finalMatch = foundExactMatch;
+    }
+
+    // If a rule is matched, send its reply
     if (finalMatch) {
         return res.json({ reply: await handleReplySend(finalMatch, message, matchedRegexGroups, req.session) });
     }
 
-    // 4. NO MATCH (Fallback to default message if available)
-    const fallback = await ChatReply.findOne({ type: 'default_message', isDefault: true });
-    if (fallback) {
-        return res.json({ reply: await handleReplySend(fallback, message, null, req.session) });
+    // If no specific rule matched, check for the catch-all rule (exact match '*')
+    if (catchAllRule) {
+        return res.json({ reply: await handleReplySend(catchAllRule, message, null, req.session) });
     }
 
-    return res.json({ reply: "Sorry, I didn't understand that." }); // Final fallback if no default message
+    // If absolutely no match, send generic fallback
+    return res.json({ reply: "Sorry, I didn't understand that." });
 });
 
 // ========== ADMIN ROUTES ==========
@@ -1208,12 +1222,12 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 
     const addReplyForm = `
     <div class="form-card">
-        <a href="/admin/dashboard" class="back-btn">
+        <button type="button" onclick="window.history.back()" class="back-btn">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
             Back
-        </a>
+        </button>
         <h2>Add Chat Reply</h2>
         <form method="POST" action="/admin/add-chat-replies">
             <label for="ruleName">Rule Name:</label>
@@ -1231,17 +1245,14 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
             <label for="type">Type:</label>
             <div class="select-wrapper">
               <select name="type" id="type" required onchange="handleTypeChange()">
-                  <option value="">--Select Type--</option>
-                  <option value="exact_match">Exact Match</option>
+                  <option value="exact_match" selected>Exact Match</option>
                   <option value="pattern_matching">Pattern Matching</option>
                   <option value="expert_pattern_matching">Expert Regex</option>
                   <option value="welcome_message">Welcome Message</option>
-                  <option value="default_message">Default Message</option>
-              </select>
+                  </select>
             </div>
 
-            <div id="keywordField" style="display:none;">
-                <label for="keyword">Keyword(s):</label>
+            <div id="keywordField" style="display:block;"> <label for="keyword">Keyword(s):</label>
                 <input name="keyword" id="keyword" placeholder="e.g. hi, hello" />
             </div>
             <div id="patternField" style="display:none;">
@@ -1263,16 +1274,6 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
             <label for="priority">Priority:</label>
             <input type="number" name="priority" id="priority" value="0" />
 
-            <div id="isDefaultField" style="display:none;">
-                <label for="isDefault">Is Default?</label>
-                <div class="select-wrapper">
-                    <select name="isDefault" id="isDefault">
-                        <option value="false">No</option>
-                        <option value="true">Yes</option>
-                    </select>
-                </div>
-            </div>
-
             <button type="submit" class="btn-main">Add Reply</button>
         </form>
     </div>
@@ -1282,34 +1283,48 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         const type = document.getElementById('type').value;
         const keywordField = document.getElementById('keywordField');
         const patternField = document.getElementById('patternField');
-        const isDefaultField = document.getElementById('isDefaultField');
+        // const isDefaultField = document.getElementById('isDefaultField'); // Removed
+
         keywordField.style.display = 'none';
         patternField.style.display = 'none';
-        isDefaultField.style.display = 'none';
-        if (type === 'exact_match' || type === 'pattern_matching') keywordField.style.display = 'block';
-        if (type === 'expert_pattern_matching') patternField.style.display = 'block';
-        if (type === 'default_message') isDefaultField.style.display = 'block';
+        // isDefaultField.style.display = 'none'; // Removed
+
+        if (type === 'exact_match' || type === 'pattern_matching' || type === 'welcome_message') { // welcome_message also uses keyword field
+            keywordField.style.display = 'block';
+        }
+        if (type === 'expert_pattern_matching') {
+            patternField.style.display = 'block';
+        }
+        // No display logic for isDefaultField anymore
     }
 
     // Custom variables are injected from the server for this specific page
     window.customVars = ${customVarsJsArray};
+
+    // Initial call to set correct visibility based on default selected option
+    document.addEventListener('DOMContentLoaded', handleTypeChange);
     </script>
     `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Chat Reply', addReplyForm, true));
 });
 
-// A. Add New Rule: (Updated for priority logic and validation)
+// 3. PRIORITY MANAGEMENT ON ADD (Backend Logic)
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
-    const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
-    if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>', true));
+    const { ruleName, type, keyword, pattern, replies, priority, sendMethod } = req.body; // isDefault removed
+    if (!replies) return res.status(400).send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>', true));
 
     // Calculate total rules for validation and default priority
     const totalRules = await ChatReply.countDocuments({});
     let newPriority = Number(priority);
 
-    // 5. Default Priority on New Rule / 6. Validation for Add
+    // 5. DEFAULT PRIORITY ON NEW RULE + 6. VALIDATION for Add
     if (isNaN(newPriority) || newPriority < 1 || newPriority > totalRules + 1) {
-        newPriority = totalRules + 1; // default = last
+        newPriority = totalRules + 1; // default = last available priority
+    }
+
+    // If the rule is a catch-all (*), ensure it's always the last priority
+    if (type === 'exact_match' && keyword === '*') {
+        newPriority = totalRules + 1; // It must be after all existing rules
     }
 
     // Shift rules below this priority down
@@ -1318,10 +1333,6 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         { $inc: { priority: 1 } }
     );
 
-    // Handle default message uniqueness
-    if (type === 'default_message' && isDefault === 'true') {
-        await ChatReply.updateMany({ type: 'default_message' }, { isDefault: false });
-    }
     const newReply = new ChatReply({
         ruleName,
         type,
@@ -1329,7 +1340,7 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         pattern: pattern || '',
         replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
         priority: newPriority, // Use the determined priority
-        isDefault: isDefault === 'true',
+        // isDefault is removed from schema
         sendMethod: sendMethod || 'random'
     });
     await newReply.save();
@@ -1341,16 +1352,29 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     // 4. LISTING & LIVE SORTING: ALWAYS sort by priority ascending
     const replies = await ChatReply.find().sort({ priority: 1 }); // Sorted by priority ascending
+
+    // Add CSS for .receive-text class
+    let listStyles = `
+        <style>
+            .receive-text {
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                max-width: 220px; /* adjust as per design */
+                display: block;
+            }
+        </style>
+    `;
+
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
-                <span class="reply-title">${(r.ruleName || 'Untitled').toUpperCase()} ${getReplyIcon(r)} (Priority: ${r.priority})</span>
+                <span class="reply-title"><b>${(r.ruleName || 'Untitled').toUpperCase()}</b> (${r.priority}) ${getReplyIcon(r)}</span>
             </div>
             <div class="reply-inner">
                 <div class="reply-row">
                     <span class="reply-label receive">Receive:</span>
-                    <span class="reply-receive">${formatReceive(r)}</span>
-                </div>
+                    ${formatReceive(r)} </div>
                 <hr>
                 <div class="reply-row">
                     <span class="reply-label send">Send:</span>
@@ -1379,13 +1403,7 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
             ${listItems || '<em>No replies found.</em>'}
             <a class="btn back" href="/admin/dashboard" style="margin-top:24px;">← Back to Dashboard</a>
         </div>
-        <style>
-            body { background: #1a1a1a; } /* Default background for reply list */
-            .nobita-reply-panel .nobita-title {
-                color: #fff; /* Revert to white for this dark background */
-                text-shadow: none; /* Removed for dark background */
-            }
-        </style>
+        ${listStyles}
         `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content, false, true));
 });
@@ -1405,12 +1423,12 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
 
         const editReplyForm = `
         <div class="form-card">
-            <a href="/admin/reply-list" class="back-btn">
+            <button type="button" onclick="window.history.back()" class="back-btn">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
                 Back
-            </a>
+            </button>
             <h2>Edit Chat Reply</h2>
             <form method="POST" action="/admin/edit-reply/${reply._id}">
                 <label for="ruleName">Rule Name:</label>
@@ -1432,11 +1450,10 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                       <option value="pattern_matching" ${reply.type === 'pattern_matching' ? 'selected' : ''}>Pattern Matching</option>
                       <option value="expert_pattern_matching" ${reply.type === 'expert_pattern_matching' ? 'selected' : ''}>Expert Regex</option>
                       <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
-                      <option value="default_message" ${reply.type === 'default_message' ? 'selected' : ''}>Default Message</option>
-                  </select>
+                      </select>
                 </div>
 
-                <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching') ? 'display:block;' : 'display:none;'}">
+                <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching' || reply.type === 'welcome_message') ? 'display:block;' : 'display:none;'}">
                     <label for="keyword">Keyword(s):</label>
                     <input name="keyword" id="keyword" value="${reply.keyword || ''}" placeholder="e.g. hi, hello" />
                 </div>
@@ -1459,16 +1476,6 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 <label for="priority">Priority:</label>
                 <input type="number" name="priority" id="priority" value="${reply.priority}" />
 
-                <div id="isDefaultField" style="${reply.type === 'default_message' ? 'display:block;' : 'display:none;'}">
-                    <label for="isDefault">Is Default?</label>
-                    <div class="select-wrapper">
-                        <select name="isDefault" id="isDefault">
-                            <option value="false" ${!reply.isDefault ? 'selected' : ''}>No</option>
-                            <option value="true" ${reply.isDefault ? 'selected' : ''}>Yes</option>
-                        </select>
-                    </div>
-                </div>
-
                 <button type="submit" class="btn-main">Update Reply</button>
             </form>
         </div>
@@ -1479,13 +1486,16 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             const type = document.getElementById('type').value;
             const keywordField = document.getElementById('keywordField');
             const patternField = document.getElementById('patternField');
-            const isDefaultField = document.getElementById('isDefaultField');
+
             keywordField.style.display = 'none';
             patternField.style.display = 'none';
-            isDefaultField.style.display = 'none';
-            if (type === 'exact_match' || type === 'pattern_matching') keywordField.style.display = 'block';
-            if (type === 'expert_pattern_matching') patternField.style.display = 'block';
-            if (type === 'default_message') isDefaultField.style.display = 'block';
+
+            if (type === 'exact_match' || type === 'pattern_matching' || type === 'welcome_message') {
+                keywordField.style.display = 'block';
+            }
+            if (type === 'expert_pattern_matching') {
+                patternField.style.display = 'block';
+            }
         }
 
         // Custom variables are injected from the server for this specific page
@@ -1499,13 +1509,13 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     }
 });
 
-// B. Edit Priority: (Updated for priority logic and validation)
+// 3. PRIORITY MANAGEMENT ON EDIT (Backend Logic)
 app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
-    const { ruleName, type, keyword, pattern, replies, priority, isDefault, sendMethod } = req.body;
+    const { ruleName, type, keyword, pattern, replies, priority, sendMethod } = req.body; // isDefault removed
     const replyId = req.params.id;
-    if (!replies) return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/edit-reply/' + replyId + '">Back to Edit Reply</a>', true));
+    if (!replies) return res.status(400).send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/edit-reply/' + replyId + '">Back to Edit Reply</a>', true));
 
-    // Get current rule to find old priority
+    // Get current rule to find old priority and prevent self-update issues
     const currentReply = await ChatReply.findById(replyId);
     if (!currentReply) return res.status(404).send(getHtmlTemplate('Error', '<p>Rule not found for update.</p><br><a href="/admin/reply-list">Back to List</a>', true));
 
@@ -1513,29 +1523,31 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     const totalRules = await ChatReply.countDocuments({}); // Get total rules for validation
     let newPriority = Number(priority);
 
-    // C. Validation (No UI, Only Backend): for Edit
+    // 6. VALIDATION for Edit
     if (isNaN(newPriority) || newPriority < 1 || newPriority > totalRules) {
         return res.status(400).send(getHtmlTemplate('Invalid Priority', '<p>Invalid priority value. Priority must be between 1 and ' + totalRules + '.</p><br><a href="/admin/edit-reply/' + replyId + '">Try again</a>', true));
     }
 
-    try {
-        if (type === 'default_message' && isDefault === 'true') {
-            await ChatReply.updateMany({ type: 'default_message', _id: { $ne: replyId } }, { isDefault: false });
-        }
+    // If the rule is a catch-all (*), ensure it's always the last priority
+    if (type === 'exact_match' && keyword === '*') {
+        newPriority = totalRules; // It must be the last priority if it's the catch-all
+    }
 
+    try {
         // Shift others based on new priority
         if (newPriority < oldPriority) {
             await ChatReply.updateMany(
-                { priority: { $gte: newPriority, $lt: oldPriority }, _id: { $ne: replyId } },
+                { priority: { $gte: newPriority, $lt: oldPriority } }, // $lt oldPriority to exclude current rule
                 { $inc: { priority: 1 } }
             );
         } else if (newPriority > oldPriority) {
             await ChatReply.updateMany(
-                { priority: { $lte: newPriority, $gt: oldPriority }, _id: { $ne: replyId } },
+                { priority: { $lte: newPriority, $gt: oldPriority } }, // $gt oldPriority to exclude current rule
                 { $inc: { priority: -1 } }
             );
         }
 
+        // Update the current rule
         await ChatReply.findByIdAndUpdate(replyId, {
             ruleName,
             type,
@@ -1543,7 +1555,7 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             pattern: pattern || '',
             replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
             priority: newPriority, // Update with the new validated priority
-            isDefault: isDefault === 'true',
+            // isDefault is removed from schema
             sendMethod: sendMethod || 'random'
         });
         res.redirect('/admin/reply-list');
@@ -1773,16 +1785,57 @@ app.post('/admin/import-rules', isAuthenticated, upload.single('csvfile'), async
         .on('data', (row) => imported.push(row))
         .on('end', async () => {
             try {
-                if (mode === 'overwrite') await ChatReply.deleteMany({});
+                if (mode === 'overwrite') {
+                    // Delete all existing rules EXCEPT welcome messages
+                    await ChatReply.deleteMany({ type: { $ne: 'welcome_message' } });
+                }
+
+                // Get current total rules for priority adjustment of new rules
+                const currentTotalRules = await ChatReply.countDocuments({});
+                let currentHighestPriority = 0; // Initialize to 0, will find max if rules exist
+                if (currentTotalRules > 0) {
+                    const highestPriorityRule = await ChatReply.findOne().sort({ priority: -1 });
+                    if (highestPriorityRule) {
+                        currentHighestPriority = highestPriorityRule.priority;
+                    }
+                }
+
                 for (let r of imported) {
+                    // Check if it's a welcome message AND if a welcome message already exists in DB (in 'overwrite' mode)
+                    if (r.type === 'welcome_message' && mode === 'overwrite') {
+                        const existingWelcome = await ChatReply.findOne({ type: 'welcome_message' });
+                        if (existingWelcome) {
+                            // If welcome exists, skip adding new one, or update existing one
+                            // For simplicity as per instruction, we'll just skip adding duplicate welcome
+                            console.log('Skipping duplicate welcome message import in overwrite mode.');
+                            continue;
+                        }
+                    }
+
+                    let rulePriority = Number(r.priority) || 0;
+
+                    // If it's a catch-all rule, set its priority to be last after all existing rules
+                    if (r.type === 'exact_match' && r.keyword === '*') {
+                        rulePriority = currentHighestPriority + 1; // Put it one after the highest current priority
+                    } else if (isNaN(rulePriority) || rulePriority < 1 || rulePriority > currentTotalRules + 1) {
+                        // If priority is invalid or not set, place it at the end (before catch-all if it exists)
+                        rulePriority = currentHighestPriority + 1;
+                    }
+
+                    // Shift existing rules if needed for this new rule's priority
+                    await ChatReply.updateMany(
+                        { priority: { $gte: rulePriority } },
+                        { $inc: { priority: 1 } }
+                    );
+
                     await ChatReply.create({
                         ruleName: r.name || r.ruleName || '',
                         type: r.type,
                         keyword: r.keyword,
                         pattern: r.pattern,
                         replies: (r.replies || '').split('<#>').map(s => s.trim()).filter(Boolean),
-                        priority: Number(r.priority) || 0,
-                        isDefault: r.isDefault === 'true' || r.isDefault === true,
+                        priority: rulePriority,
+                        // isDefault removed
                         sendMethod: r.sendMethod || 'random'
                     });
                 }
@@ -1800,8 +1853,9 @@ app.post('/admin/import-rules', isAuthenticated, upload.single('csvfile'), async
 });
 
 app.post('/admin/export-rules', isAuthenticated, async (req, res) => {
-    const rules = await ChatReply.find({});
-    let csvContent = 'ruleName,type,keyword,pattern,replies,priority,isDefault,sendMethod\n'; // Ensure header matches schema fields
+    // 4. LISTING & LIVE SORTING: Export also sorted by priority
+    const rules = await ChatReply.find({}).sort({ priority: 1 });
+    let csvContent = 'ruleName,type,keyword,pattern,replies,priority,sendMethod\n'; // isDefault removed from header
     for (const r of rules) {
         // Escape double quotes within fields by doubling them
         const escapedRuleName = (r.ruleName || '').replace(/"/g,'""');
@@ -1809,7 +1863,7 @@ app.post('/admin/export-rules', isAuthenticated, async (req, res) => {
         const escapedPattern = (r.pattern || '').replace(/"/g,'""');
         const escapedReplies = (r.replies || []).join('<#>').replace(/"/g,'""');
 
-        csvContent += `"${escapedRuleName}","${r.type}","${escapedKeyword}","${escapedPattern}","${escapedReplies}",${r.priority},${r.isDefault},"${r.sendMethod||'random'}"\n`;
+        csvContent += `"${escapedRuleName}","${r.type}","${escapedKeyword}","${escapedPattern}","${escapedReplies}",${r.priority},"${r.sendMethod||'random'}"\n`;
     }
     const fileName = (req.body.filename||'nobita_rules').replace(/[^a-z0-9_-]/gi,'_') + '.csv';
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
