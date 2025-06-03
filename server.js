@@ -48,7 +48,6 @@ const ChatReplySchema = new mongoose.Schema({
     pattern: String,
     replies: [String],
     priority: { type: Number, default: 0 },
-    // 1. DEFAULT REPLY SYSTEM (REMOVE) - isDefault field removed
     sendMethod: { type: String, enum: ['random', 'all', 'once'], default: 'random' }
 });
 const ChatReply = mongoose.model('ChatReply', ChatReplySchema);
@@ -96,13 +95,11 @@ function getReplyIcon(r) {
     if (r.type === 'pattern_matching') return "🧩";
     if (r.type === 'expert_pattern_matching') return "🧠";
     if (r.type === 'welcome_message') return "👋";
-    // 1. DEFAULT REPLY SYSTEM (REMOVE) - No specific icon for default_message type, as it's being replaced.
     return "";
 }
 
 // Helper for formatting receive field in reply list (Defined once here)
 function formatReceive(r) {
-    // C. Received/Keywords Truncate One Line Only
     const text = (r.type === 'exact_match' || r.type === 'pattern_matching') ? r.keyword : (r.type === 'expert_pattern_matching' ? r.pattern : (r.keyword || r.pattern || ''));
     return `<span class="receive-text">${trimText(text, 5)}</span>`; // Adjusted word limit for better single-line display
 }
@@ -212,11 +209,20 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 gap: 6px;
                 position: relative;
                 margin-bottom: 17px;
+                flex-wrap: wrap; /* Added to handle new buttons */
+            }
+            /* New button container style */
+            .reply-area-buttons {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 10px;
+                align-items: center;
             }
             .reply-area textarea {
                 flex: 1;
                 margin-bottom: 0;
                 padding-right: 44px;
+                width: 100%; /* Ensure it takes full width within its flex context */
             }
             .reply-icon-btn {
                 position: absolute;
@@ -391,6 +397,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 font-family: 'Lexend', 'Roboto', sans-serif;
                 margin: 0;
                 padding: 0;
+                background: #1a1a1a; /* Default background for reply list */
             }
             .admin-container {
                 max-width: 700px;
@@ -440,7 +447,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 color: #8338ec;
                 filter: drop-shadow(0 1px 2px #f6f2ffb8);
             }
-            /* Reply List specific styles (overridden for dark background) */
+            /* Reply List specific styles from previous versions, adjusted */
             .nobita-reply-panel {
                 max-width: 600px;
                 margin: 32px auto 60px auto;
@@ -448,14 +455,14 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 position: relative;
             }
             .nobita-title {
-                color: #8227b3; /* Changed to match form heading color originally, but for list it's white */
+                color: #fff; /* Revert to white for this dark background */
                 font-family: 'Lexend', sans-serif;
-                letter-spacing: 1.5px;
+                letter-spacing: 1px;
                 margin-bottom: 0;
                 text-align: left;
-                font-weight: 800;
-                font-size: 2.1rem;
-                text-shadow: 0 2px 14px #e3d2ff7c;
+                font-weight: 700;
+                font-size: 28px;
+                text-shadow: none; /* Removed for dark background */
             }
             .reply-list-header {
                 display: flex;
@@ -465,7 +472,7 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 padding: 0;
             }
             .add-reply-btn-top {
-                background: linear-gradient(90deg, #7e4af5 40%, #bf51e8 100%);
+                background: linear-gradient(90deg, #4f46e5 40%, #6138ca 100%); /* Adjusted for dark background */
                 color: #fff;
                 padding: 8px 16px;
                 border-radius: 8px;
@@ -476,111 +483,93 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
                 display: flex;
                 align-items: center;
                 gap: 5px;
-                box-shadow: 0 2px 8px #c79fff44;
+                box-shadow: 0 2px 8px #0004;
             }
             .add-reply-btn-top:hover {
-                background: linear-gradient(90deg, #6124d4 40%, #8227b3 100%);
+                background: linear-gradient(90deg, #4338ca 40%, #512f9b 100%);
                 transform: translateY(-1px);
-                box-shadow: 0 4px 12px #b48ffa55;
+                box-shadow: 0 4px 12px #0006;
             }
              .add-reply-btn-top:active {
                 transform: scale(0.98);
-                box-shadow: 0 1px 4px #b48ffa55;
+                box-shadow: 0 1px 4px #0005;
             }
             .add-reply-btn-top .lucide {
                 font-size: 1.2rem;
             }
 
+            /* 3. Reply List - Stylish gangster theme */
+            .reply-list {
+                padding: 20px 0; /* Adjusted padding as container has horizontal padding already */
+                min-height: 90vh; /* This should probably be on body or main container */
+            }
             .reply-card {
-                background: linear-gradient(98deg, #272733 80%, #3d1153 100%);
-                border: 1.5px solid #d074f9cc;
-                border-radius: 16px;
-                box-shadow: 0 3px 18px #0006;
-                padding: 16px 16px 12px 16px;
-                margin-bottom: 30px;
+                background: linear-gradient(120deg, #24183b 70%, #23123a 100%);
+                box-shadow: 0 6px 24px 0 #0009, 0 1.5px 3px #714fff40;
+                border-radius: 18px;
+                margin-bottom: 24px;
+                padding: 18px 22px 16px 22px;
+                color: #f8e9ff;
+                font-family: 'Lexend', 'Inter', 'Segoe UI', sans-serif;
+                transition: box-shadow 0.25s;
+                border: 1.5px solid #39355a;
                 position: relative;
-            }
-            .reply-header {
-                font-size: 19px;
-                font-weight: 700;
-                color: #fff;
-                letter-spacing: 1px;
-                margin-bottom: 12px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            .reply-title {
-                text-transform: uppercase;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-            .reply-inner {
-                background: rgba(34,34,40,0.75);
-                border-radius: 10px;
-                padding: 12px 14px 8px 14px;
-            }
-            .reply-row {
-                display: flex;
-                gap: 8px;
-                align-items: flex-start;
-                margin-bottom: 7px;
-                flex-wrap: wrap;
-            }
-            .reply-label {
-                min-width: 70px;
-                color: #ffc952;
-                font-family: 'Lexend', 'Inter', sans-serif;
-                font-weight: 600;
-                font-size: 15px;
-                letter-spacing: 0.3px;
-            }
-            .reply-label.send { color: #ff6f61; }
-            .reply-label.receive { color: #46e579; }
-            .receive-text { /* C. Received/Keywords Truncate One Line Only */
                 overflow: hidden;
-                white-space: nowrap;
-                text-overflow: ellipsis;
-                max-width: 220px; /* adjust as per design */
-                display: block;
             }
-            hr {
-                border: 0;
-                border-top: 1.5px dashed #b197d6;
-                margin: 8px 0 8px 0;
+            .reply-card:hover {
+                box-shadow: 0 10px 32px 0 #5026ff66, 0 2px 6px #a259ff3f;
+            }
+            .reply-name {
+                font-weight: 800;
+                font-size: 1.1rem;
+                letter-spacing: 0.5px;
+                margin-bottom: 8px;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                gap: 7px;
+            }
+            .reply-priority {
+                font-size: 1rem;
+                background: #7c3aed;
+                color: #fff;
+                border-radius: 7px;
+                padding: 2px 11px;
+                margin-left: 8px;
+                font-weight: 700;
+                letter-spacing: 1px;
+            }
+            .reply-receive { /* Adjusted to use .receive-text class now */
+                font-size: 0.97rem;
+                color: #aabbec;
+                border-left: 3.5px solid #7c3aed;
+                padding-left: 10px;
+                margin-bottom: 7px;
+                /* white-space, overflow, text-overflow, max-width moved to .receive-text */
+            }
+            .reply-send {
+                font-size: 1rem;
+                color: #ffe2f5;
+                background: #281d39;
+                border-radius: 7px;
+                padding: 8px 12px;
+                margin-top: 5px;
+                word-break: break-all;
+                box-shadow: 0 2px 6px #9007;
             }
             .reply-actions {
                 position: absolute;
-                top: 14px;
-                right: 20px;
-                display: flex;
-                gap: 10px;
+                top: 15px; right: 17px;
+                display: flex; gap: 7px;
             }
-            .reply-actions a svg {
-                stroke: #ffc952;
-                background: #232337;
-                border-radius: 6px;
-                padding: 2px;
-                transition: background 0.15s, stroke 0.15s;
+            .reply-actions a { /* Changed from button to a for links */
+                background: none; border: none; color: #c7a7fc; font-size: 1.1rem; cursor: pointer;
+                padding: 2px 7px;
+                text-decoration: none; /* Remove underline for anchor tags */
             }
-            .reply-actions a:hover svg {
-                background: #ffc952;
-                stroke: #232337;
+            .reply-actions a:hover {
+                color: #ffe167;
             }
-            .btn.back {
-                background: #282836;
-                color: #ffc952;
-                padding: 10px 22px;
-                border-radius: 7px;
-                text-decoration: none;
-                font-weight: 700;
-                font-size: 16px;
-                margin-left: 0;
-                display: block;
-                width: fit-content;
-            }
-            .btn.back:hover { background: #ffc952; color: #282836; }
 
             /* Responsive Adjustments for Reply List */
             @media (max-width: 700px) {
@@ -854,7 +843,8 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
       function insertVarToReply(variable) {
         // Find the currently focused textarea with id 'replies'
         // This is important for delegation, to know which textarea to insert into
-        const textarea = document.getElementById('replies'); // Assuming 'replies' is the common ID for the textarea
+        // Changed to use the ID `replyTextarea` which is the actual textarea now
+        const textarea = document.getElementById('replyTextarea');
         if (textarea) { // Ensure textarea exists
             const start = textarea.selectionStart;
             const end = textarea.selectionEnd;
@@ -886,20 +876,29 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
       });
 
       // Close popup if clicked outside (on the overlay)
-      document.addEventListener('click', function(e){ // Changed from varPopup.addEventListener
+      document.addEventListener('click', function(e){
           if (e.target === varPopup) {
               varPopup.style.opacity = '0';
               varPopup.style.pointerEvents = 'none';
           }
       });
 
-
-      // -------- FIXED PART: USE EVENT DELEGATION FOR BUTTON --------
-      // Listen for clicks on the document body
+      // 2. Custom Variable Button/Popup Fix: Event delegation for customVarBtn
       document.body.addEventListener('click', function(e){
-        // Check if the clicked element (or its parent) has the 'reply-icon-btn' class
-        // This uses .closest() which is robust for nested elements
-        if(e.target.closest('.reply-icon-btn')) {
+        // Check if the clicked element (or its parent) has the 'customVarBtn' ID
+        if(e.target.id === 'customVarBtn') {
+          varPopup.style.opacity = '1';
+          varPopup.style.pointerEvents = 'auto';
+          showVarPopup();
+        }
+      });
+
+      // -------- FIXED PART: USE EVENT DELEGATION FOR REPLY ICON BUTTON --------
+      // Listen for clicks on the document body for the 'reply-icon-btn' (if still used)
+      document.body.addEventListener('click', function(e){
+        if(e.target.closest('.reply-icon-btn')) { // Use closest for robustness
+          // Now, this button should also insert into 'replyTextarea'
+          // Ensure the global 'insertVarToReply' is correctly set up for 'replyTextarea'
           varPopup.style.opacity = '1';
           varPopup.style.pointerEvents = 'auto';
           showVarPopup();
@@ -1016,7 +1015,7 @@ async function handleReplySend(replyObj, userMessage, matchedRegexGroups = null,
     });
 
     // --- 3. System Variables ---
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const now = new Date(new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })); // Assuming India as context
     replyText = replyText.replace(/%message%/g, userMessage || '');
     replyText = replyText.replace(/%message_(\d+)%/g, (match, len) => (userMessage || '').substring(0, parseInt(len)));
     if (matchedRegexGroups) {
@@ -1059,7 +1058,6 @@ app.post('/api/chatbot/message', async (req, res) => {
     let finalMatch = null;
     let matchedRegexGroups = null; // To store regex groups if an expert pattern matches
 
-    // 7. BONUS: WELCOME MESSAGE
     // Check for welcome message first - still highest priority at start of chat
     if (!req.session.seenWelcome) {
         req.session.seenWelcome = true;
@@ -1074,24 +1072,23 @@ app.post('/api/chatbot/message', async (req, res) => {
     // Get all rules sorted by priority for efficient lookup and master selection
     const allRules = await ChatReply.find({}).sort({ priority: 1 }); // Sorted by priority ascending
 
-    // 5. CATCH-ALL RULE (EXACT MATCH * ONLY LAST PE TRIGGER HO)
     // Find the catch-all rule if it exists, but don't consider it for primary matching yet
     const catchAllRule = allRules.find(rule => rule.type === "exact_match" && rule.keyword === '*');
     const nonCatchAllRules = allRules.filter(rule => !(rule.type === "exact_match" && rule.keyword === '*'));
 
-    // 1. EXPERT PATTERN ALWAYS WINS LOGIC (REFINED)
-    // Iterate through rules in order of precedence: Pattern -> Expert Regex -> Exact (non-catch-all)
+    // Iterate through non-catch-all rules based on precedence and priority
     let foundPatternMatch = null;
     let foundExpertMatch = null;
     let foundExactMatch = null;
 
-    // First pass: Find the highest priority match for each type (excluding catch-all)
+    // We need to find the BEST match for each type first (highest priority, i.e., lowest priority number)
+    // Then apply the Pattern > Expert > Exact hierarchy.
+
     for (const rule of nonCatchAllRules) {
         if (rule.type === 'pattern_matching') {
             const keywords = rule.keyword?.split(',').map(k => k.trim().toLowerCase()) || [];
             if (keywords.some(k => message.toLowerCase().includes(k))) {
-                // If this rule has higher priority than current patternMatch, update
-                if (!foundPatternMatch || rule.priority < foundPatternMatch.priority) { // Lower priority number means higher priority
+                if (!foundPatternMatch || rule.priority < foundPatternMatch.priority) {
                     foundPatternMatch = rule;
                 }
             }
@@ -1101,29 +1098,28 @@ app.post('/api/chatbot/message', async (req, res) => {
                     const regex = new RegExp(rule.pattern, 'i');
                     const match = regex.exec(message);
                     if (match) {
-                        // If this rule has higher priority than current expertMatch, update
                         if (!foundExpertMatch || rule.priority < foundExpertMatch.priority) {
                             foundExpertMatch = rule;
-                            matchedRegexGroups = match; // Capture groups for the best expert match
+                            matchedRegexGroups = match; // Capture groups from the best expert match
                         }
                     }
                 }
             } catch (e) { console.error("Expert Regex pattern error for rule:", rule.ruleName, e); }
-        } else if (rule.type === 'exact_match' && rule.keyword !== '*') {
+        } else if (rule.type === 'exact_match') { // Excluding '*' here already handled by nonCatchAllRules
             if (rule.keyword === message.trim().toLowerCase()) {
-                // If this rule has higher priority than current exactMatch, update
                 if (!foundExactMatch || rule.priority < foundExactMatch.priority) {
                     foundExactMatch = rule;
                 }
             }
-        } else if (rule.type === 'welcome_message') {
-            // Welcome message already handled at the very beginning of the route
-            // No need to process here if req.session.seenWelcome is true.
         }
+        // 7. BONUS: WELCOME MESSAGE - If it's a welcome message type, and it was not filtered out,
+        // it means it was a welcome rule, but it's not the initial conversation.
+        // We generally don't want welcome messages to interrupt active conversations unless they are also
+        // designed as pattern/exact matches. The current logic handles this by processing it first.
     }
 
-    // Determine the final match based on the hierarchy: Expert > Pattern > Exact
-    if (foundExpertMatch) { // Expert Pattern wins if found
+    // Determine the final match based on the strict hierarchy: Expert > Pattern > Exact
+    if (foundExpertMatch) { // Expert Pattern wins if found (Highest priority overall)
         finalMatch = foundExpertMatch;
     } else if (foundPatternMatch) { // Otherwise, Pattern Matching wins if found
         finalMatch = foundPatternMatch;
@@ -1131,12 +1127,12 @@ app.post('/api/chatbot/message', async (req, res) => {
         finalMatch = foundExactMatch;
     }
 
-    // If a rule is matched, send its reply
+    // If a specific rule is matched, send its reply
     if (finalMatch) {
         return res.json({ reply: await handleReplySend(finalMatch, message, matchedRegexGroups, req.session) });
     }
 
-    // If no specific rule matched, check for the catch-all rule (exact match '*')
+    // If no specific rule matched (Pattern, Expert, Exact non-'*'), then consider the catch-all rule
     if (catchAllRule) {
         return res.json({ reply: await handleReplySend(catchAllRule, message, null, req.session) });
     }
@@ -1158,7 +1154,7 @@ app.get('/admin/login', (req, res) => {
         <input type="password" name="password" id="password" placeholder="Password" required />
         <button type="submit">Login</button>
     </form>`;
-    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Login', loginForm, true)); // Using form styles here
+    res.set('Content-Type', 'text/html').send(getHtmlTemplate('Admin Login', loginForm, true));
 });
 app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
@@ -1166,7 +1162,7 @@ app.post('/admin/login', async (req, res) => {
     if (!admin || !(await admin.comparePassword(password))) {
         return res.set('Content-Type', 'text/html').send(getHtmlTemplate('Login Failed', `
             <p>Login failed. <a href="/admin/login">Try again</a></p>
-        `, true)); // Also using form styles for login failed message
+        `, true));
     }
     req.session.loggedIn = true;
     req.session.username = username;
@@ -1249,7 +1245,7 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
                   <option value="pattern_matching">Pattern Matching</option>
                   <option value="expert_pattern_matching">Expert Regex</option>
                   <option value="welcome_message">Welcome Message</option>
-                  </select>
+              </select>
             </div>
 
             <div id="keywordField" style="display:block;"> <label for="keyword">Keyword(s):</label>
@@ -1261,15 +1257,26 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
             </div>
 
             <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-            <div class="reply-area">
-              <textarea name="replies" id="replies" required></textarea>
-              <button type="button" class="reply-icon-btn" title="Insert Variable">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
-                  <polyline points="3 8 12 13 21 8"/>
-                </svg>
-              </button>
+            <div class="reply-area-buttons">
+                <button type="button" id="customVarBtn" class="reply-icon-btn" title="Insert Variable">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
+                        <polyline points="3 8 12 13 21 8"/>
+                    </svg>
+                    Custom Replacements
+                </button>
+                <input type="file" id="txtUpload" accept=".txt" style="display: none;">
+                <button type="button" id="uploadTxtBtn" class="reply-icon-btn" title="Upload TXT File">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 14.899V20a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5.1"/>
+                        <path d="M12 2v13.5"/>
+                        <path d="m7 9 5-5 5 5"/>
+                    </svg>
+                    Upload TXT
+                </button>
             </div>
+            <textarea name="replies" id="replyTextarea" required></textarea>
+
 
             <label for="priority">Priority:</label>
             <input type="number" name="priority" id="priority" value="0" />
@@ -1283,19 +1290,16 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         const type = document.getElementById('type').value;
         const keywordField = document.getElementById('keywordField');
         const patternField = document.getElementById('patternField');
-        // const isDefaultField = document.getElementById('isDefaultField'); // Removed
 
         keywordField.style.display = 'none';
         patternField.style.display = 'none';
-        // isDefaultField.style.display = 'none'; // Removed
 
-        if (type === 'exact_match' || type === 'pattern_matching' || type === 'welcome_message') { // welcome_message also uses keyword field
+        if (type === 'exact_match' || type === 'pattern_matching' || type === 'welcome_message') {
             keywordField.style.display = 'block';
         }
         if (type === 'expert_pattern_matching') {
             patternField.style.display = 'block';
         }
-        // No display logic for isDefaultField anymore
     }
 
     // Custom variables are injected from the server for this specific page
@@ -1303,6 +1307,20 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 
     // Initial call to set correct visibility based on default selected option
     document.addEventListener('DOMContentLoaded', handleTypeChange);
+
+    // 1. TXT File Upload Button For Textarea JS
+    document.getElementById('uploadTxtBtn').onclick = function() {
+        document.getElementById('txtUpload').click();
+    };
+    document.getElementById('txtUpload').onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('replyTextarea').value = e.target.result;
+        };
+        reader.readAsText(file);
+    };
     </script>
     `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Add Chat Reply', addReplyForm, true));
@@ -1310,10 +1328,11 @@ app.get('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
 
 // 3. PRIORITY MANAGEMENT ON ADD (Backend Logic)
 app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
-    const { ruleName, type, keyword, pattern, replies, priority, sendMethod } = req.body; // isDefault removed
+    const { ruleName, type, keyword, pattern, replies, priority, sendMethod } = req.body;
     if (!replies) return res.status(400).send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/add-chat-replies">Back to Add Reply</a>', true));
 
-    // Calculate total rules for validation and default priority
+    // Calculate total rules for validation and default priority (excluding welcome messages for count if needed, but here count all)
+    // For priority management, it's safer to count all existing rules.
     const totalRules = await ChatReply.countDocuments({});
     let newPriority = Number(priority);
 
@@ -1322,12 +1341,13 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         newPriority = totalRules + 1; // default = last available priority
     }
 
-    // If the rule is a catch-all (*), ensure it's always the last priority
+    // If the rule is a catch-all (*), ensure it's always the last priority by overriding any user-set priority
     if (type === 'exact_match' && keyword === '*') {
         newPriority = totalRules + 1; // It must be after all existing rules
     }
 
     // Shift rules below this priority down
+    // This is crucial: only shift if the new rule is inserted somewhere in between
     await ChatReply.updateMany(
         { priority: { $gte: newPriority } },
         { $inc: { priority: 1 } }
@@ -1340,7 +1360,6 @@ app.post('/admin/add-chat-replies', isAuthenticated, async (req, res) => {
         pattern: pattern || '',
         replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
         priority: newPriority, // Use the determined priority
-        // isDefault is removed from schema
         sendMethod: sendMethod || 'random'
     });
     await newReply.save();
@@ -1353,33 +1372,13 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     // 4. LISTING & LIVE SORTING: ALWAYS sort by priority ascending
     const replies = await ChatReply.find().sort({ priority: 1 }); // Sorted by priority ascending
 
-    // Add CSS for .receive-text class
-    let listStyles = `
-        <style>
-            .receive-text {
-                overflow: hidden;
-                white-space: nowrap;
-                text-overflow: ellipsis;
-                max-width: 220px; /* adjust as per design */
-                display: block;
-            }
-        </style>
-    `;
-
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
-                <span class="reply-title"><b>${(r.ruleName || 'Untitled').toUpperCase()}</b> (${r.priority}) ${getReplyIcon(r)}</span>
+                <span class="reply-name"><b>${(r.ruleName || 'Untitled').toUpperCase()}</b> <span class="reply-priority">${r.priority}</span> ${getReplyIcon(r)}</span>
             </div>
-            <div class="reply-inner">
-                <div class="reply-row">
-                    <span class="reply-label receive">Receive:</span>
-                    ${formatReceive(r)} </div>
-                <hr>
-                <div class="reply-row">
-                    <span class="reply-label send">Send:</span>
-                    <span class="reply-send">${formatSend(r)}</span>
-                </div>
+            <div class="reply-body">
+                <div class="reply-receive">${formatReceive(r)}</div> <div class="reply-send">${formatSend(r)}</div>
             </div>
             <div class="reply-actions">
                 <a href="/admin/edit-reply/${r._id}" title="Edit">
@@ -1400,10 +1399,11 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
                     <span>Add Reply</span>
                 </a>
             </div>
-            ${listItems || '<em>No replies found.</em>'}
+            <div class="reply-list">
+                ${listItems || '<em style="color:#f8e9ff; text-align:center; display:block;">No replies found.</em>'}
+            </div>
             <a class="btn back" href="/admin/dashboard" style="margin-top:24px;">← Back to Dashboard</a>
         </div>
-        ${listStyles}
         `;
     res.set('Content-Type', 'text/html').send(getHtmlTemplate('Reply List', content, false, true));
 });
@@ -1450,7 +1450,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                       <option value="pattern_matching" ${reply.type === 'pattern_matching' ? 'selected' : ''}>Pattern Matching</option>
                       <option value="expert_pattern_matching" ${reply.type === 'expert_pattern_matching' ? 'selected' : ''}>Expert Regex</option>
                       <option value="welcome_message" ${reply.type === 'welcome_message' ? 'selected' : ''}>Welcome Message</option>
-                      </select>
+                  </select>
                 </div>
 
                 <div id="keywordField" style="${(reply.type === 'exact_match' || reply.type === 'pattern_matching' || reply.type === 'welcome_message') ? 'display:block;' : 'display:none;'}">
@@ -1463,15 +1463,25 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
                 </div>
 
                 <label for="replies">Replies (use &lt;#&gt; between lines):</label>
-                <div class="reply-area">
-                  <textarea name="replies" id="replies" required>${reply.replies.join('<#>')}</textarea>
-                  <button type="button" class="reply-icon-btn" title="Insert Variable">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
-                      <polyline points="3 8 12 13 21 8"/>
-                    </svg>
-                  </button>
+                <div class="reply-area-buttons">
+                    <button type="button" id="customVarBtn" class="reply-icon-btn" title="Insert Variable">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
+                            <polyline points="3 8 12 13 21 8"/>
+                        </svg>
+                        Custom Replacements
+                    </button>
+                    <input type="file" id="txtUpload" accept=".txt" style="display: none;">
+                    <button type="button" id="uploadTxtBtn" class="reply-icon-btn" title="Upload TXT File">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 14.899V20a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5.1"/>
+                            <path d="M12 2v13.5"/>
+                            <path d="m7 9 5-5 5 5"/>
+                        </svg>
+                        Upload TXT
+                    </button>
                 </div>
+                <textarea name="replies" id="replyTextarea" required>${reply.replies.join('<#>')}</textarea>
 
                 <label for="priority">Priority:</label>
                 <input type="number" name="priority" id="priority" value="${reply.priority}" />
@@ -1500,6 +1510,20 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
 
         // Custom variables are injected from the server for this specific page
         window.customVars = ${customVarsJsArray};
+
+        // 1. TXT File Upload Button For Textarea JS
+        document.getElementById('uploadTxtBtn').onclick = function() {
+            document.getElementById('txtUpload').click();
+        };
+        document.getElementById('txtUpload').onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('replyTextarea').value = e.target.result;
+            };
+            reader.readAsText(file);
+        };
         </script>
         `;
         res.set('Content-Type', 'text/html').send(getHtmlTemplate('Edit Chat Reply', editReplyForm, true));
@@ -1511,7 +1535,7 @@ app.get('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
 
 // 3. PRIORITY MANAGEMENT ON EDIT (Backend Logic)
 app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
-    const { ruleName, type, keyword, pattern, replies, priority, sendMethod } = req.body; // isDefault removed
+    const { ruleName, type, keyword, pattern, replies, priority, sendMethod } = req.body;
     const replyId = req.params.id;
     if (!replies) return res.status(400).send(getHtmlTemplate('Error', '<p>Replies required</p><br><a href="/admin/edit-reply/' + replyId + '">Back to Edit Reply</a>', true));
 
@@ -1528,7 +1552,7 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
         return res.status(400).send(getHtmlTemplate('Invalid Priority', '<p>Invalid priority value. Priority must be between 1 and ' + totalRules + '.</p><br><a href="/admin/edit-reply/' + replyId + '">Try again</a>', true));
     }
 
-    // If the rule is a catch-all (*), ensure it's always the last priority
+    // If the rule is a catch-all (*), ensure it's always the last priority by overriding any user-set priority
     if (type === 'exact_match' && keyword === '*') {
         newPriority = totalRules; // It must be the last priority if it's the catch-all
     }
@@ -1536,13 +1560,15 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
     try {
         // Shift others based on new priority
         if (newPriority < oldPriority) {
+            // Shift rules between newPriority and oldPriority (exclusive of oldPriority) downwards
             await ChatReply.updateMany(
-                { priority: { $gte: newPriority, $lt: oldPriority } }, // $lt oldPriority to exclude current rule
+                { priority: { $gte: newPriority, $lt: oldPriority } },
                 { $inc: { priority: 1 } }
             );
         } else if (newPriority > oldPriority) {
+            // Shift rules between oldPriority (exclusive of oldPriority) and newPriority upwards
             await ChatReply.updateMany(
-                { priority: { $lte: newPriority, $gt: oldPriority } }, // $gt oldPriority to exclude current rule
+                { priority: { $lte: newPriority, $gt: oldPriority } },
                 { $inc: { priority: -1 } }
             );
         }
@@ -1555,7 +1581,6 @@ app.post('/admin/edit-reply/:id', isAuthenticated, async (req, res) => {
             pattern: pattern || '',
             replies: replies.split('<#>').map(r => r.trim()).filter(Boolean),
             priority: newPriority, // Update with the new validated priority
-            // isDefault is removed from schema
             sendMethod: sendMethod || 'random'
         });
         res.redirect('/admin/reply-list');
@@ -1835,7 +1860,6 @@ app.post('/admin/import-rules', isAuthenticated, upload.single('csvfile'), async
                         pattern: r.pattern,
                         replies: (r.replies || '').split('<#>').map(s => s.trim()).filter(Boolean),
                         priority: rulePriority,
-                        // isDefault removed
                         sendMethod: r.sendMethod || 'random'
                     });
                 }
