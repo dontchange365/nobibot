@@ -711,11 +711,9 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
       }
 
       function insertVarToReply(variable) {
-        // Find the currently focused textarea with id 'replies'
-        // This is important for delegation, to know which textarea to insert into
-        // Changed to use the ID `replyTextarea` which is the actual textarea now
+        // Find the currently focused textarea with id 'replyTextarea'
         const textarea = document.getElementById('replyTextarea');
-        if (textarea) { // Ensure textarea exists
+        if (textarea) {
             const start = textarea.selectionStart;
             const end = textarea.selectionEnd;
             const value = textarea.value;
@@ -753,10 +751,8 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
           }
       });
 
-      // 2. Custom Variable Button/Popup Fix: Event delegation for customVarBtn
+      // Event delegation for customVarBtn (now using its ID)
       document.body.addEventListener('click', function(e){
-        // Check if the clicked element (or its parent) has the 'customVarBtn' ID
-        // Or if it's the specific SVG/path inside it.
         const customVarBtn = e.target.closest('#customVarBtn');
         if(customVarBtn) {
           varPopup.style.opacity = '1';
@@ -765,9 +761,10 @@ function getHtmlTemplate(title, bodyContent, includeFormStyles = false, includeD
         }
       });
 
-      // This is now redundant as we have a specific #customVarBtn and #uploadTxtBtn
-      // and they are outside the textarea, not icon inside it.
-      // Keeping it for robustness if you have other dynamic buttons with this class
+      // The original reply-icon-btn which was INSIDE textarea is now removed from HTML.
+      // The new buttons use reply-icon-btn class but are handled by their specific IDs.
+      // This listener below could be generalized or removed if no other elements use this class.
+      // For safety, keeping it with closest().
       // document.body.addEventListener('click', function(e){
       //   if(e.target.closest('.reply-icon-btn')) {
       //     varPopup.style.opacity = '1';
@@ -1249,16 +1246,16 @@ app.get('/admin/reply-list', isAuthenticated, async (req, res) => {
     const listItems = replies.map((r, index) => `
         <div class="reply-card">
             <div class="reply-header">
-                <span class="reply-name"><b>${(r.ruleName || 'Untitled').toUpperCase()}</b> <span class="reply-priority">${r.priority}</span> ${getReplyIcon(r)}</span>
-            </div>
-            <div class="reply-body">
-                <div class="reply-receive">${formatReceive(r)}</div> <div class="reply-send">${formatSend(r)}</div>
-            </div>
-            <div class="reply-actions">
-                <a href="/admin/edit-reply/${r._id}" title="Edit">
+                <span class="reply-name"><b><span class="math-inline">\{\(r\.ruleName \|\| 'Untitled'\)\.toUpperCase\(\)\}</b\> <span class\="reply\-priority"\></span>{r.priority}</span> <span class="math-inline">\{getReplyIcon\(r\)\}</span\>
+</div\>
+<div class\="reply\-body"\>
+<div class\="reply\-receive"\></span>{formatReceive(r)}</div> <div class="reply-send"><span class="math-inline">\{formatSend\(r\)\}</div\>
+</div\>
+<div class\="reply\-actions"\>
+<a href\="/admin/edit\-reply/</span>{r._id}" title="Edit">
                   <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4l-9.5 9.5-4 1 1-4L17 3Z"/><path d="M15 5l4 4"/></svg>
                 </a>
-                <a href="/admin/delete-reply/${r._id}" title="Delete" onclick="return confirm('Delete this rule?')">
+                <a href="/admin/delete-reply/${r._id}" title="Delete" onclick="return confirm('Delete this rule?')">
                   <svg height="20" width="20" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg>
                 </a>
             </div>
